@@ -1,0 +1,6 @@
+*.db3 filter=lfs diff=lfs merge=lfs -text
+<<<<<<< HEAD
+src/autonomous_rov/bags/*.db3 filter=lfs diff=lfs merge=lfs -text
+=======
+*.jpg filter=lfs diff=lfs merge=lfs -text
+>>>>>>> daff35e1c83b91b9452a6c05efa3a5b033a43c16

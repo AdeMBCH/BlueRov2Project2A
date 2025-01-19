@@ -1,0 +1,33 @@
+[0.486s] Invoking command in '/home/projet_sysmer/ros2_ws/src/autonomous_rov': PYTHONPATH=/home/projet_sysmer/ros2_ws/build/autonomous_rov/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/autonomous_rov build --build-base /home/projet_sysmer/ros2_ws/build/autonomous_rov/build install --record /home/projet_sysmer/ros2_ws/build/autonomous_rov/install.log --single-version-externally-managed install_data
+[0.657s] running egg_info
+[0.666s] writing ../../build/autonomous_rov/autonomous_rov.egg-info/PKG-INFO
+[0.669s] writing dependency_links to ../../build/autonomous_rov/autonomous_rov.egg-info/dependency_links.txt
+[0.670s] writing entry points to ../../build/autonomous_rov/autonomous_rov.egg-info/entry_points.txt
+[0.670s] writing requirements to ../../build/autonomous_rov/autonomous_rov.egg-info/requires.txt
+[0.670s] writing top-level names to ../../build/autonomous_rov/autonomous_rov.egg-info/top_level.txt
+[0.693s] reading manifest file '../../build/autonomous_rov/autonomous_rov.egg-info/SOURCES.txt'
+[0.694s] writing manifest file '../../build/autonomous_rov/autonomous_rov.egg-info/SOURCES.txt'
+[0.694s] running build
+[0.694s] running build_py
+[0.694s] copying autonomous_rov/image_processing_yolo.py -> /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov
+[0.695s] copying autonomous_rov/visual_servoing.py -> /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov
+[0.695s] copying autonomous_rov/visual_servoing_essai.py -> /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov
+[0.695s] copying autonomous_rov/image_processing_tracker.py -> /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov
+[0.695s] running install
+[0.698s] running install_lib
+[0.707s] copying /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov/visual_servoing_essai.py -> /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov
+[0.707s] byte-compiling /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/visual_servoing_essai.py to visual_servoing_essai.cpython-310.pyc
+[0.710s] running install_data
+[0.710s] copying launch/run_visual_servo.launch -> /home/projet_sysmer/ros2_ws/install/autonomous_rov/share/autonomous_rov/launch
+[0.710s] copying setup.py -> /home/projet_sysmer/ros2_ws/install/autonomous_rov/share/autonomous_rov/lib
+[0.710s] copying __init__.py -> /home/projet_sysmer/ros2_ws/install/autonomous_rov/share/autonomous_rov/lib
+[0.710s] running install_egg_info
+[0.721s] removing '/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov-0.0.0-py3.10.egg-info' (and everything under it)
+[0.721s] Copying ../../build/autonomous_rov/autonomous_rov.egg-info to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov-0.0.0-py3.10.egg-info
+[0.721s] running install_scripts
+[0.802s] Installing image_processing_tracker script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.802s] Installing pinger_node script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.802s] Installing video script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.802s] Installing visual_servoing script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.802s] writing list of installed files to '/home/projet_sysmer/ros2_ws/build/autonomous_rov/install.log'
+[0.827s] Invoked command in '/home/projet_sysmer/ros2_ws/src/autonomous_rov' returned '0': PYTHONPATH=/home/projet_sysmer/ros2_ws/build/autonomous_rov/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/autonomous_rov build --build-base /home/projet_sysmer/ros2_ws/build/autonomous_rov/build install --record /home/projet_sysmer/ros2_ws/build/autonomous_rov/install.log --single-version-externally-managed install_data

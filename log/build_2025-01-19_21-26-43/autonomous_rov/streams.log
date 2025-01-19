@@ -1,0 +1,30 @@
+[0.467s] Invoking command in '/home/projet_sysmer/ros2_ws/src/autonomous_rov': PYTHONPATH=/home/projet_sysmer/ros2_ws/build/autonomous_rov/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/autonomous_rov build --build-base /home/projet_sysmer/ros2_ws/build/autonomous_rov/build install --record /home/projet_sysmer/ros2_ws/build/autonomous_rov/install.log --single-version-externally-managed install_data
+[0.614s] running egg_info
+[0.622s] writing ../../build/autonomous_rov/autonomous_rov.egg-info/PKG-INFO
+[0.622s] writing dependency_links to ../../build/autonomous_rov/autonomous_rov.egg-info/dependency_links.txt
+[0.623s] writing entry points to ../../build/autonomous_rov/autonomous_rov.egg-info/entry_points.txt
+[0.623s] writing requirements to ../../build/autonomous_rov/autonomous_rov.egg-info/requires.txt
+[0.623s] writing top-level names to ../../build/autonomous_rov/autonomous_rov.egg-info/top_level.txt
+[0.640s] reading manifest file '../../build/autonomous_rov/autonomous_rov.egg-info/SOURCES.txt'
+[0.641s] writing manifest file '../../build/autonomous_rov/autonomous_rov.egg-info/SOURCES.txt'
+[0.641s] running build
+[0.641s] running build_py
+[0.641s] copying autonomous_rov/visual_servoing.py -> /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov
+[0.642s] copying autonomous_rov/image_processing_tracker.py -> /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov
+[0.642s] running install
+[0.645s] running install_lib
+[0.654s] copying /home/projet_sysmer/ros2_ws/build/autonomous_rov/build/lib/autonomous_rov/image_processing_tracker.py -> /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov
+[0.654s] byte-compiling /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/image_processing_tracker.py to image_processing_tracker.cpython-310.pyc
+[0.655s] running install_data
+[0.655s] copying launch/run_visual_servo.launch -> /home/projet_sysmer/ros2_ws/install/autonomous_rov/share/autonomous_rov/launch
+[0.655s] copying setup.py -> /home/projet_sysmer/ros2_ws/install/autonomous_rov/share/autonomous_rov/lib
+[0.655s] running install_egg_info
+[0.664s] removing '/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov-0.0.0-py3.10.egg-info' (and everything under it)
+[0.665s] Copying ../../build/autonomous_rov/autonomous_rov.egg-info to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov-0.0.0-py3.10.egg-info
+[0.665s] running install_scripts
+[0.742s] Installing image_processing_tracker script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.742s] Installing pinger_node script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.743s] Installing video script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.743s] Installing visual_servoing script to /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov
+[0.743s] writing list of installed files to '/home/projet_sysmer/ros2_ws/build/autonomous_rov/install.log'
+[0.762s] Invoked command in '/home/projet_sysmer/ros2_ws/src/autonomous_rov' returned '0': PYTHONPATH=/home/projet_sysmer/ros2_ws/build/autonomous_rov/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/autonomous_rov build --build-base /home/projet_sysmer/ros2_ws/build/autonomous_rov/build install --record /home/projet_sysmer/ros2_ws/build/autonomous_rov/install.log --single-version-externally-managed install_data

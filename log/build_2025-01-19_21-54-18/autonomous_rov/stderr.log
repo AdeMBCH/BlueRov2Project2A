@@ -1,0 +1,5 @@
+  File "/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/visual_servoing.py", line 190
+    f'{yaw_left_right}, {self.thruttle}, {}')
+                                            ^
+SyntaxError: f-string: empty expression not allowed
+

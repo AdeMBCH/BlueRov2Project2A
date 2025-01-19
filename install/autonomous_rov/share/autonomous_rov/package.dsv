@@ -1,0 +1,6 @@
+source;share/autonomous_rov/hook/pythonpath.ps1
+source;share/autonomous_rov/hook/pythonpath.dsv
+source;share/autonomous_rov/hook/pythonpath.sh
+source;share/autonomous_rov/hook/ament_prefix_path.ps1
+source;share/autonomous_rov/hook/ament_prefix_path.dsv
+source;share/autonomous_rov/hook/ament_prefix_path.sh
