@@ -7,21 +7,21 @@ Ce projet implémente un système de commande visuelle pour un ROV autonome en u
 - image_processing_tracker.py : Ce nœud effectue le traitement d'images, y compris la détection d'objets et le suivi des points. **Assurez-vous que le topic de la caméra est correct. Vous pouvez le vérifier avec la commande suivante :**
   
 
-bash
+```bash
   ros2 topic list
-
+```
 
   **Si vous rencontrez des problèmes avec l'affichage des images, assurez-vous de modifier correctement le code de conversion des images :**
   
 
-python
+```python
   try:
       # Si vous utilisez des images non compressées (sensor_msgs/Image)
       image_np = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
       # Si vous utilisez des images compressées (sensor_msgs/CompressedImage)
       # image_np = self.bridge.compressed_imgmsg_to_cv2(msg)
-
+```
 
 - visual_servoing_node.py : Ce nœud implémente la commande visuelle, calculant l'erreur entre le point suivi et le point désiré, et ajustant la position du robot en conséquence. **Il contrôle les mouvements latéraux, le lacet (yaw) et l'avance (forward) du ROV à l'aide d'un correcteur proportionnel.**
 - launch : Dossier contenant des fichiers de lancement pour exécuter les nœuds.
@@ -36,19 +36,19 @@ python
 
 Assurez-vous que toutes les dépendances sont installées avant de compiler :
 
-bash
+```bash
 cd ~/ros2_ws
 colcon build --symlink-install
-
+```
 
 
 ## Source l'espace de travail
 
 Avant de lancer les nœuds, sourcez votre espace de travail ROS 2 :
 
-bash
+```bash
 source ~/ros2_ws/install/setup.bash
-
+```
 
 
 ## Lancer les Nœuds
@@ -57,18 +57,18 @@ source ~/ros2_ws/install/setup.bash
 
 Le nœud image_processing_tracker est responsable de la réception des images de la caméra et du traitement pour détecter et suivre un objet.
 
-bash
+```bash
 ros2 launch autonomous_rov image_process.launch.py
-
+```
 
 
 ### 2. Lancer le nœud de commande visuelle
 
 Le nœud visual_servoing_node reçoit les informations du point suivi et calcule les commandes de mouvement pour le robot en fonction de l'erreur.
 
-bash
+```bash
 ros2 launch autonomous_rov visual_servoing.launch.py
-
+```
 
 
 ## Description des fichiers de lancement
@@ -95,19 +95,19 @@ Le projet inclut deux fichiers de lancement principaux :
 1. **Install Python dependencies**:
    
 
-bash
+```bash
    pip install torch torchvision matplotlib numpy opencv-python
-
+```
 
 
 2. **Clone YOLOv5 Repository**:
    
 
-bash
+```bash
    git clone https://github.com/ultralytics/yolov5.git
    cd yolov5
    pip install -r requirements.txt
-
+```
 
 
 ---
@@ -118,10 +118,10 @@ bash
    - Create directories for training and validation data:
      
 
-bash
+```bash
      mkdir -p ~/ros2_ws/src/autonomous_rov/yoloV5/train
      mkdir -p ~/ros2_ws/src/autonomous_rov/yoloV5/valid
-
+```
 
    - Place your images and YOLO-format annotations (.txt files) into the corresponding directories:
      
@@ -142,7 +142,7 @@ bash
    - Create a file named data.yaml in the yoloV8 folder with the following content:
      
 
-yaml
+```yaml
      train: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/train
      val: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/valid
      test: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/test
@@ -157,7 +157,7 @@ yaml
        - yellow-buoy
 
 
-
+```
 ---
 
 ## **Train YOLOv5**
@@ -165,17 +165,17 @@ yaml
 1. Navigate to the YOLOv5 directory:
    
 
-bash
+```bash
    cd ~/ros2_ws/src/yolov5
-
+```
 
 
 2. Run the training command:
    
 
-bash
+```bash
    python3 train.py --img 640 --batch 16 --epochs 50 --data /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/data.yaml --weights yolov5s.pt
-
+```
 
 
 3. Monitor training:
@@ -190,9 +190,9 @@ runs/train/exp/weights/
 4. Optional: Use TensorBoard for real-time monitoring:
    
 
-bash
+```bash
    tensorboard --logdir runs/train
-
+```
 
 
 ---
