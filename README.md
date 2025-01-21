@@ -8,7 +8,7 @@ Ce projet implémente un système de commande visuelle pour un ROV autonome en u
   
 
 bash
-  ros2 topic list
+ros2 topic list
 
 
   **Si vous rencontrez des problèmes avec l'affichage des images, assurez-vous de modifier correctement le code de conversion des images :**
