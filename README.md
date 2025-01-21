@@ -1,114 +1,109 @@
 # Autonomous ROV - Visual Servoing & Image Processing
 
-Ce projet implémente un système de commande visuelle pour un ROV autonome en utilisant ROS 2 Iron. Le projet inclut un algorithme de suivi d'objet et une commande visuelle pour ajuster les mouvements du robot en fonction des points suivis dans les images.
+This project implements a visual servoing system for an autonomous ROV using ROS 2 Iron. The project includes an object tracking algorithm and a visual control system to adjust the robot's movements based on tracked points in images.
 
-## Structure du projet
+## Project Structure
 
-- image_processing_tracker.py : Ce nœud effectue le traitement d'images, y compris la détection d'objets et le suivi des points. **Assurez-vous que le topic de la caméra est correct. Vous pouvez le vérifier avec la commande suivante :**
+- **image_processing_tracker.py**: This node performs image processing, including object detection and point tracking. **Make sure the camera topic is correct. You can check it with the following command:**
   
-
 ```bash
   ros2 topic list
 ```
 
-  **Si vous rencontrez des problèmes avec l'affichage des images, assurez-vous de modifier correctement le code de conversion des images :**
+  **If you encounter issues with image display, ensure you correctly modify the image conversion code:**
   
-
 ```python
   try:
-      # Si vous utilisez des images non compressées (sensor_msgs/Image)
+      # If using uncompressed images (sensor_msgs/Image)
       image_np = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
-      # Si vous utilisez des images compressées (sensor_msgs/CompressedImage)
+      # If using compressed images (sensor_msgs/CompressedImage)
       # image_np = self.bridge.compressed_imgmsg_to_cv2(msg)
 ```
 
-- visual_servoing_node.py : Ce nœud implémente la commande visuelle, calculant l'erreur entre le point suivi et le point désiré, et ajustant la position du robot en conséquence. **Il contrôle les mouvements latéraux, le lacet (yaw) et l'avance (forward) du ROV à l'aide d'un correcteur proportionnel.**
-- launch : Dossier contenant des fichiers de lancement pour exécuter les nœuds.
+- **visual_servoing_node.py**: This node implements the visual servoing system, computing the error between the tracked point and the desired point and adjusting the robot's position accordingly. **It controls the ROV's lateral movements, yaw, and forward motion using a proportional controller.**
+- **launch**: Directory containing launch files to execute the nodes.
 
-## Prérequis
+## Prerequisites
 
-- **ROS 2 Iron** (compatible avec les versions ROS 2 plus récentes)
-- **OpenCV** pour le traitement d'image
-- **cv_bridge** pour la conversion entre OpenCV et les messages ROS
+- **ROS 2 Iron** (compatible with newer ROS 2 versions)
+- **OpenCV** for image processing
+- **cv_bridge** for conversion between OpenCV and ROS messages
 
-## Installer les dépendances
+## Install Dependencies
 
-Assurez-vous que toutes les dépendances sont installées avant de compiler :
+Ensure all dependencies are installed before compiling:
 
 ```bash
 cd ~/ros2_ws
 colcon build --symlink-install
 ```
 
+## Source the Workspace
 
-## Source l'espace de travail
-
-Avant de lancer les nœuds, sourcez votre espace de travail ROS 2 :
+Before launching the nodes, source your ROS 2 workspace:
 
 ```bash
 source ~/ros2_ws/install/setup.bash
 ```
 
+## Launching the Nodes
 
-## Lancer les Nœuds
+### 1. Launch the Image Processing Node
 
-### 1. Lancer le nœud de traitement d'image
-
-Le nœud image_processing_tracker est responsable de la réception des images de la caméra et du traitement pour détecter et suivre un objet.
+The `image_processing_tracker` node is responsible for receiving camera images and processing them to detect and track an object.
 
 ```bash
 ros2 launch autonomous_rov image_process.launch.py
 ```
 
+### 2. Launch the Visual Servoing Node
 
-### 2. Lancer le nœud de commande visuelle
-
-Le nœud visual_servoing_node reçoit les informations du point suivi et calcule les commandes de mouvement pour le robot en fonction de l'erreur.
+The `visual_servoing_node` receives tracking information and calculates motion commands for the robot based on the error.
 
 ```bash
 ros2 launch autonomous_rov visual_servoing.launch.py
 ```
 
+## Launch File Descriptions
 
-## Description des fichiers de lancement
+The project includes two main launch files:
 
-Le projet inclut deux fichiers de lancement principaux :
+- **visual_servoing.launch.py**: Launches the visual servoing and image processing nodes.
+- **image_processing.launch.py**: Allows specifying the camera topic and launches only the necessary nodes for image processing.
 
-- **visual_servoing.launch.py** : Lance les nœuds de commande visuelle et de traitement d'image.
-- **image_processing.launch.py** : Permet de spécifier le topic de la caméra et lance uniquement les nœuds nécessaires pour le traitement d'image.
+## Troubleshooting
 
-## Dépannage
+### Nodes Are Not Connected
 
-### Les nœuds ne sont pas connectés
+- Ensure that your nodes are correctly launched and that they communicate via the appropriate topics. You can check the topics with the command:
 
-- Assurez-vous que vos nœuds sont correctement lancés et qu'ils communiquent entre eux via les topics appropriés. Vous pouvez vérifier les topics avec la commande ros2 topic list.
+```bash
+ros2 topic list
+```
 
-### Problèmes avec les images de la caméra
+### Issues with Camera Images
 
-- Assurez-vous que la caméra est bien configurée et que le topic correspondant est correctement publié.
-- Modifiez la conversion des images selon le format utilisé dans votre pipeline ROS 2.
+- Make sure the camera is properly configured and that the corresponding topic is correctly published.
+- Modify the image conversion according to the format used in your ROS 2 pipeline.
 
 # YOLOv5 Integration with ROS2 for Buoy Detection
+
 ## **Prerequisites**
 
 1. **Install Python dependencies**:
    
-
 ```bash
    pip install torch torchvision matplotlib numpy opencv-python
 ```
 
-
 2. **Clone YOLOv5 Repository**:
    
-
 ```bash
    git clone https://github.com/ultralytics/yolov5.git
    cd yolov5
    pip install -r requirements.txt
 ```
-
 
 ---
 
@@ -117,7 +112,6 @@ Le projet inclut deux fichiers de lancement principaux :
 1. **Organize your dataset**:
    - Create directories for training and validation data:
      
-
 ```bash
      mkdir -p ~/ros2_ws/src/autonomous_rov/yoloV5/train
      mkdir -p ~/ros2_ws/src/autonomous_rov/yoloV5/valid
@@ -125,8 +119,8 @@ Le projet inclut deux fichiers de lancement principaux :
 
    - Place your images and YOLO-format annotations (.txt files) into the corresponding directories:
      
-
-~/ros2_ws/src/autonomous_rov/yoloV8/
+```
+~/ros2_ws/src/autonomous_rov/yoloV5/
      ├── train/
      │   ├── image1.jpg
      │   ├── image1.txt
@@ -135,13 +129,11 @@ Le projet inclut deux fichiers de lancement principaux :
      │   ├── image2.jpg
      │   ├── image2.txt
      │   └── ...
-
-
+```
 
 2. **Prepare the data.yaml file**:
-   - Create a file named data.yaml in the yoloV8 folder with the following content:
+   - Create a file named `data.yaml` in the `yoloV5` folder with the following content:
      
-
 ```yaml
      train: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/train
      val: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/valid
@@ -155,8 +147,6 @@ Le projet inclut deux fichiers de lancement principaux :
        - red-buoy
        - water_target
        - yellow-buoy
-
-
 ```
 ---
 
@@ -164,44 +154,38 @@ Le projet inclut deux fichiers de lancement principaux :
 
 1. Navigate to the YOLOv5 directory:
    
-
 ```bash
    cd ~/ros2_ws/src/yolov5
 ```
 
-
 2. Run the training command:
    
-
 ```bash
    python3 train.py --img 640 --batch 16 --epochs 50 --data /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/data.yaml --weights yolov5s.pt
 ```
 
-
 3. Monitor training:
    - Training results (including the best model weights) will be saved in:
      
-
+```
 runs/train/exp/weights/
-
-
-   - The best model is saved as best.pt.
+```
+   - The best model is saved as `best.pt`.
 
 4. Optional: Use TensorBoard for real-time monitoring:
    
-
 ```bash
    tensorboard --logdir runs/train
 ```
-
 
 ---
 
 ## **Testing**
 
-Once the training is complete, the generated best.pt model can be used directly in your ROS2 node for real-time buoy detection.
+Once the training is complete, the generated `best.pt` model can be used directly in your ROS2 node for real-time buoy detection.
 
 ## **Acknowledgements**
 
 - YOLOv5 by Ultralytics: [GitHub Repository](https://github.com/ultralytics/yolov5)
 - ROS2 documentation: [ros.org](https://docs.ros.org)
+
