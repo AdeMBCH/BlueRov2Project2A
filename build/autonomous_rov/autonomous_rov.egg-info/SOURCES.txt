@@ -16,7 +16,6 @@ autonomous_rov/image_processing_yolo.py
 autonomous_rov/listenerMIR.py
 autonomous_rov/pinger_node.py
 autonomous_rov/video.py
-autonomous_rov/visual_servoing.py
 autonomous_rov/visual_servoing_essai.py
 config/xbox.config.yaml
 launch/run_gamepad.launch

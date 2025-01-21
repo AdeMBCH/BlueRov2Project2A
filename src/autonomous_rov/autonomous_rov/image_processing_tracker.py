@@ -96,8 +96,6 @@ class ImageProcessingNode(Node):
             self.cameracallback,
             10)
 
-        self.subscription  # prevent unused variable warning
-
         self.bridge = CvBridge()  # CvBridge for converting ROS images to OpenCV format
 
         cv2.namedWindow("image")  # Create the window before setting the mouse callback

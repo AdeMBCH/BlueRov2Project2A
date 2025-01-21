@@ -41,9 +41,13 @@ class VisualServoing(Node):
 
         self.desired_point = None
         self.tracked_point = None
+        self.has_tracked_point = False
+
         self.tolerance_error = 0.10
         self.Z = 1.0
-        self.P = 3.0
+        self.P = 4.0
+        self.I = 0.4
+        self.D = 0.1
         self.motor_max_val = 1900
         self.motor_min_val = 1100
         self.Correction_yaw = 1500
@@ -56,24 +60,21 @@ class VisualServoing(Node):
         self.error_integral = [0.0, 0.0]
         self.error_derivative = [0.0, 0.0]
 
-        # self.desired_point_vs = None
-        # self.current_points = None
 
     def segment_callback(self, msg):
         x1, y1, x2, y2 = msg.data
         current_width = x2 - x1  # Largeur actuelle du segment
 
         if current_width < self.THRESHOLD_WIDTH:
-
             move = True
         else:
-
             move = False
-
-        # Publier l'ordre de mouvement
         self.forward_move(move)
 
     def forward_move(self, move):
+        # if self.has_tracked_point is False:
+        #     self.thruttle = 1500
+        #     self.get_logger().info("Aucun segment on avance pas.")
         if move == True:
             self.thruttle = 1550
             self.get_logger().info("La bouée est trop petite → Le robot doit avancer.")
@@ -82,7 +83,6 @@ class VisualServoing(Node):
             self.get_logger().info("La bouée est proche → Le robot reste en place.")
 
     def desired_point_callback(self, msg):
-        # self.get_logger().info('feur')
         if len(msg.data) >= 2:
             self.desired_point = np.array(msg.data)
             # self.get_logger().info(f"Received desired point: {self.desired_point}")
@@ -91,7 +91,6 @@ class VisualServoing(Node):
 
     def tracked_point_callback(self, msg):
         if self.desired_point is None:
-            # self.get_logger().info('feur')
             return
         else:
             if len(msg.data) >= 2:
@@ -108,7 +107,7 @@ class VisualServoing(Node):
         else:
 
             error = self.desired_point - self.tracked_point
-
+            error[1] =0.0
             error_array_msg = Float64MultiArray()
             error_array_msg.data = error.tolist()
             self.error_publisher.publish(error_array_msg)
@@ -132,7 +131,11 @@ class VisualServoing(Node):
 
         try:
             L_pinv = np.linalg.pinv(meanL)
-            cam_speed = -self.P * L_pinv.dot(error)
+            cam_speed = (self.P * L_pinv.dot(error)
+                        +self.I * L_pinv.dot(error_integral)
+                        +self.D * L_pinv.dot(error_derivative))
+
+            # self.get_logger().error(f"Error is {error}")
         except:
             self.get_logger().error("Singular interaction matrix, cannot compute pseudo-inverse")
             return
@@ -162,7 +165,6 @@ class VisualServoing(Node):
         robot_speed_msg.angular.z = robot_speed[5]
         self.robot_speed_publisher.publish(robot_speed_msg)
 
-
         # self.get_logger().info(
         #     f"Robot speed before publishing: Linear X={robot_speed[0]}, Y={robot_speed[1]}, Z={robot_speed[2]}, "
         #     f"Angular X={robot_speed[3]}, Y={robot_speed[4]}, Z={robot_speed[5]}")
@@ -184,15 +186,17 @@ class VisualServoing(Node):
         pitch_left_right = self.mapValueScalSat(cmd_vel.angular.y)
         yaw_left_right = self.mapValueScalSat(-cmd_vel.angular.z)
 
-        self.get_logger().info(f"Yaw speed: {cmd_vel.angular.z}")
-        self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
+        # self.get_logger().info(f"Yaw speed: {cmd_vel.angular.z}")
+        # self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
 
         # Send commands to robot
         self.setOverrideRCIN(pitch_left_right, roll_left_right, ascend_descend,
                               yaw_left_right, forward_reverse, lateral_left_right)
 
-        self.get_logger().info(f' Published new command to RCIN {1500}, {1500}, {1500},'
-                               f'{1500}, {self.thruttle}, {lateral_left_right-12}')
+        self.get_logger().info(f' Published new command to RCIN :'
+                               f' {yaw_left_right}, '   #need to check
+                               f' {self.thruttle}, '     #okay
+                               f' {lateral_left_right}')    #okay
 
     def transform_velocity(self, cam_speed, H):
         # Transform camera velocity to robot velocity using homogeneous transform H
