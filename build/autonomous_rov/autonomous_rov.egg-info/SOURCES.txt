@@ -15,6 +15,7 @@ autonomous_rov/image_processing_tracker.py
 autonomous_rov/image_processing_yolo.py
 autonomous_rov/listenerMIR.py
 autonomous_rov/pinger_node.py
+autonomous_rov/state_machine_visual_servo.py
 autonomous_rov/video.py
 autonomous_rov/visual_servoing_essai.py
 config/xbox.config.yaml

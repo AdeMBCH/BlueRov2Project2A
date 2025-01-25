@@ -5,6 +5,7 @@
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/camera_parameters.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/visual_servoing_essai.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__init__.py
+/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/state_machine_visual_servo.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/image_processing_tracker.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/listenerMIR.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/image_processing_yolo.cpython-310.pyc
@@ -13,6 +14,7 @@
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/camera_parameters.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/visual_servoing_essai.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/__init__.cpython-310.pyc
+/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/state_machine_visual_servo.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/image_processing_tracker.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/share/ament_index/resource_index/packages/autonomous_rov
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/share/autonomous_rov/package.xml

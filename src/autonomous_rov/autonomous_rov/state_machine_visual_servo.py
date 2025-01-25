@@ -22,7 +22,6 @@ class VisualServoing(Node):
         self.get_logger().info("Subscriptions succesfully created")
 
         # Publishers
-
         self.corrected_vel = self.create_publisher(Twist, 'computed_error', 10)
         self.overrideRCIN_publisher = self.create_publisher(OverrideRCIn, "rc/override", 10)
         self.angle_in_degree_publisher = self.create_publisher(Twist, 'angle_degree', 10)
@@ -58,10 +57,42 @@ class VisualServoing(Node):
         self.error_integral = [0.0, 0.0]
         self.error_derivative = [0.0, 0.0]
 
+        self.state = "SEARCHING"
+        self.last_known_position = None
+
+    def update_state(self):
+        if self.state == "SEARCHING":
+            self.search_for_buoy()
+        elif self.state == "TRACKING":
+            self.compute_visual_servo()  # Déjà existant
+        elif self.state == "LOST":
+            self.reorient_to_last_known_position()
+
+    def search_for_buoy(self):
+        self.get_logger().info("Exploration pour retrouver la bouée...")
+        cmd_vel = Twist()
+        cmd_vel.angular.z = 0.3  # Rotation pour chercher
+        self.robot_speed_publisher.publish(cmd_vel)
+
+    def reorient_to_last_known_position(self):
+        if self.last_known_position is None:
+            self.get_logger().warn("Aucune dernière position connue. On explore.")
+            self.state = "SEARCHING"
+            return
+
+        self.get_logger().info(f"Réorientation vers {self.last_known_position}")
+        error = self.last_known_position - np.array([0, 0])  # On suppose [0,0] comme centre caméra
+        cmd_vel = Twist()
+        cmd_vel.linear.x = 0.2 if abs(error[0]) > self.tolerance_error else 0.0
+        cmd_vel.angular.z = 0.2 if abs(error[1]) > self.tolerance_error else 0.0
+        self.robot_speed_publisher.publish(cmd_vel)
+
+        if np.linalg.norm(error) < self.tolerance_error:
+            self.state = "SEARCHING"
 
     def segment_callback(self, msg):
         x1, y1, x2, y2 = msg.data
-        current_width = x2 - x1  # Largeur actuelle du segment
+        current_width = x2 - x1
 
         if current_width < self.THRESHOLD_WIDTH:
             move = True
@@ -88,15 +119,27 @@ class VisualServoing(Node):
             self.get_logger().warn("Received invalid desired point data!")
 
     def tracked_point_callback(self, msg):
-        if self.desired_point is None:
-            return
+        if len(msg.data) >= 2:
+            self.tracked_point = np.array(msg.data)
+
+            if self.desired_point is None:
+                return
+
+            self.last_known_position = self.tracked_point
+
+            if self.state == "SEARCHING":
+                self.state = "TRACKING"
+
+            self.compute_visual_servo()
         else:
-            if len(msg.data) >= 2:
-                self.tracked_point = np.array(msg.data)
-                # self.get_logger().info(f"Received tracked point: {self.tracked_point}")
-                self.compute_visual_servo()
-            else:
-                self.get_logger().warn("Received invalid tracked point data!")
+            self.get_logger().warn("Received invalid tracked point data!")
+
+    def check_buoy_visibility(self):
+        if self.tracked_point is None:
+            if self.state == "TRACKING":
+                self.state = "LOST"
+                self.get_logger().warn("Buoy lost ! Trying to catch it up...")
+                self.reorient_to_last_known_position()
 
     def compute_error(self):
         if self.desired_point is None or self.tracked_point is None:
@@ -239,12 +282,17 @@ class VisualServoing(Node):
 
         #self.overrideRCIN_publisher.publish(msg_override)
 
+
 def main(args=None):
     rclpy.init(args=args)
     visual_servo_node = VisualServoing()
+
     try:
-        rclpy.spin(visual_servo_node)
+        while rclpy.ok():
+            rclpy.spin_once(visual_servo_node, timeout_sec=0.1)
+            visual_servo_node.update_state()
     except KeyboardInterrupt:
+        visual_servo_node.get_logger().info("Arrêt du visual servoing.")
         visual_servo_node.destroy_node()
         rclpy.shutdown()
 

@@ -3,7 +3,6 @@ import numpy as np
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64MultiArray, Int16, Float64, Empty, String
-from visualization_msgs.msg import Marker
 from mavros_msgs.msg import OverrideRCIn, Mavlink
 
 
@@ -24,7 +23,6 @@ class VisualServoing(Node):
 
         # Publishers
 
-        self.marker_pub = self.create_publisher(Marker,'visualization_marker',10)
         self.corrected_vel = self.create_publisher(Twist, 'computed_error', 10)
         self.overrideRCIN_publisher = self.create_publisher(OverrideRCIn, "rc/override", 10)
         self.angle_in_degree_publisher = self.create_publisher(Twist, 'angle_degree', 10)
@@ -102,8 +100,7 @@ class VisualServoing(Node):
 
     def compute_error(self):
         if self.desired_point is None or self.tracked_point is None:
-            return None, None, None, None, None, None
-            # self.get_logger().info('Failed to get desired point and tracked ')
+            return np.zeros(2), np.zeros(2), np.zeros(2)
         else:
 
             error = self.desired_point - self.tracked_point
@@ -135,12 +132,11 @@ class VisualServoing(Node):
                         +self.I * L_pinv.dot(error_integral)
                         +self.D * L_pinv.dot(error_derivative))
 
-            self.get_logger().error(f"Error is {error}")
+            # self.get_logger().error(f"Error is {error}")
         except:
             self.get_logger().error("Singular interaction matrix, cannot compute pseudo-inverse")
+            self.error_integral = np.zeros(2)
             return
-
-        # self.get_logger().info(f"Computed camera speed: {cam_speed}")
 
         # Publish camera velocity
         cam_speed_msg = Twist()
@@ -165,15 +161,12 @@ class VisualServoing(Node):
         robot_speed_msg.angular.z = robot_speed[5]
         self.robot_speed_publisher.publish(robot_speed_msg)
 
-
         # self.get_logger().info(
         #     f"Robot speed before publishing: Linear X={robot_speed[0]}, Y={robot_speed[1]}, Z={robot_speed[2]}, "
         #     f"Angular X={robot_speed[3]}, Y={robot_speed[4]}, Z={robot_speed[5]}")
 
         # Map robot velocity to control commands
         cmd_vel = Twist()
-        cmd_vel.linear.x = robot_speed[0]
-        cmd_vel.linear.y = robot_speed[1]
         cmd_vel.linear.z = robot_speed[2]
         cmd_vel.angular.x = robot_speed[3]
         cmd_vel.angular.y = robot_speed[4]
@@ -195,7 +188,9 @@ class VisualServoing(Node):
                               yaw_left_right, forward_reverse, lateral_left_right)
 
         self.get_logger().info(f' Published new command to RCIN :'
-                               f'{yaw_left_right}, {self.thruttle}, {lateral_left_right}')
+                               f' {yaw_left_right}, '   #need to check
+                               f' {self.thruttle}, '     #okay
+                               f' {lateral_left_right}')    #okay
 
     def transform_velocity(self, cam_speed, H):
         # Transform camera velocity to robot velocity using homogeneous transform H
@@ -223,9 +218,6 @@ class VisualServoing(Node):
         return L
 
     def mapValueScalSat(self, value):
-        # Correction_Vel and joy between -1 et 1
-        # scaling for publishing with setOverrideRCIN values between 1100 and 1900
-        # neutral point is 1500
         pulse_width = value * 400 + 1500
 
         # Saturation
