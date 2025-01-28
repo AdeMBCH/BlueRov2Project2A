@@ -1,10 +1,11 @@
 import rclpy
 import numpy as np
+from duplicity.config import current_time
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64MultiArray, Int16, Float64, Empty, String
 from mavros_msgs.msg import OverrideRCIn, Mavlink
-
+import time
 
 class VisualServoing(Node):
     def __init__(self):
@@ -39,6 +40,7 @@ class VisualServoing(Node):
         self.desired_point = None
         self.tracked_point = None
         self.has_tracked_point = False
+        self.buoy_detected = False
 
         self.tolerance_error = 0.10
         self.Z = 1.0
@@ -59,24 +61,53 @@ class VisualServoing(Node):
 
         self.state = "SEARCHING"
         self.last_known_position = None
+        self.search_mode = "spiral"
+        self.start_time = time.time()
+        self.timeout_duration = 1.0
 
     def update_state(self):
         if self.state == "SEARCHING":
+            if self.tracked_point is not None:
+                self.buoy_detected = True
+                self.state = 'TRACKING'
+                self.get_logger().info(f"La bouée vient d'être retrouvée...")
+                return
+
             self.search_for_buoy()
+
         elif self.state == "TRACKING":
-            self.compute_visual_servo()  # Déjà existant
+            current_time = time.time()
+            self.compute_visual_servo()
+            if self.last_tracked_time and (current_time - self.last_tracked_time > self.timeout_duration):
+                self.state = 'LOST'
+                self.get_logger().warn("Tracked point lost! Switching to LOST state.")
+                self.tracked_point = None
+
         elif self.state == "LOST":
             self.reorient_to_last_known_position()
 
     def search_for_buoy(self):
-        self.get_logger().info("Exploration pour retrouver la bouée...")
         cmd_vel = Twist()
-        cmd_vel.angular.z = 0.3  # Rotation pour chercher
+        elapsed_time = time.time() - self.start_time
+
+        if self.search_mode == "spiral":
+            cmd_vel.linear.x = min(0.2 + elapsed_time * 0.01, 0.5)  # Avancer de plus en plus vite
+            cmd_vel.angular.z = 0.5 / (1 + elapsed_time * 0.1)  # Diminuer la rotation avec le temps
+
+        elif self.search_mode == "eight":
+            cmd_vel.linear.x = 0.2  # Avancer
+            cmd_vel.angular.z = 0.5 * (-1) ** int(elapsed_time % 2)
+
+        self.get_logger().info(f"Searching buoy around {self.last_known_position}")
         self.robot_speed_publisher.publish(cmd_vel)
 
     def reorient_to_last_known_position(self):
-        if self.last_known_position is None:
-            self.get_logger().warn("Aucune dernière position connue. On explore.")
+        if self.tracked_point is not None:
+            self.get_logger().info("La bouée a été retrouvée, arrêt de la réorientation.")
+            self.state = "TRACKING"
+            return
+
+        if self.last_known_position is None or time.time() - self.last_tracked_time > 10:
             self.state = "SEARCHING"
             return
 
@@ -87,8 +118,6 @@ class VisualServoing(Node):
         cmd_vel.angular.z = 0.2 if abs(error[1]) > self.tolerance_error else 0.0
         self.robot_speed_publisher.publish(cmd_vel)
 
-        if np.linalg.norm(error) < self.tolerance_error:
-            self.state = "SEARCHING"
 
     def segment_callback(self, msg):
         x1, y1, x2, y2 = msg.data
@@ -101,9 +130,6 @@ class VisualServoing(Node):
         self.forward_move(move)
 
     def forward_move(self, move):
-        # if self.has_tracked_point is False:
-        #     self.thruttle = 1500
-        #     self.get_logger().info("Aucun segment on avance pas.")
         if move == True:
             self.thruttle = 1550
             self.get_logger().info("La bouée est trop petite → Le robot doit avancer.")
@@ -114,11 +140,11 @@ class VisualServoing(Node):
     def desired_point_callback(self, msg):
         if len(msg.data) >= 2:
             self.desired_point = np.array(msg.data)
-            # self.get_logger().info(f"Received desired point: {self.desired_point}")
         else:
             self.get_logger().warn("Received invalid desired point data!")
 
     def tracked_point_callback(self, msg):
+        self.last_tracked_time = time.time()
         if len(msg.data) >= 2:
             self.tracked_point = np.array(msg.data)
 
@@ -138,7 +164,6 @@ class VisualServoing(Node):
         if self.tracked_point is None:
             if self.state == "TRACKING":
                 self.state = "LOST"
-                self.get_logger().warn("Buoy lost ! Trying to catch it up...")
                 self.reorient_to_last_known_position()
 
     def compute_error(self):
@@ -151,7 +176,7 @@ class VisualServoing(Node):
             error_array_msg = Float64MultiArray()
             error_array_msg.data = error.tolist()
             self.error_publisher.publish(error_array_msg)
-            # self.get_logger().info(f'Computed new error : {error_array_msg}')
+
 
             self.error_integral += error
 
@@ -231,9 +256,9 @@ class VisualServoing(Node):
                               yaw_left_right, forward_reverse, lateral_left_right)
 
         self.get_logger().info(f' Published new command to RCIN :'
-                               f' {yaw_left_right}, '   #need to check
-                               f' {self.thruttle}, '     #okay
-                               f' {lateral_left_right}')    #okay
+                               f' yaw : {yaw_left_right}, '   #need to check
+                               f' thruttle : {self.thruttle}, '     #okay
+                               f' lateral lr : {lateral_left_right}')    #okay
 
     def transform_velocity(self, cam_speed, H):
         # Transform camera velocity to robot velocity using homogeneous transform H

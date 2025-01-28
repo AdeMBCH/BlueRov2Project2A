@@ -44,8 +44,8 @@ class VisualServoing(Node):
         self.tolerance_error = 0.10
         self.Z = 1.0
         self.P = 4.0
-        self.I = 0.4
-        self.D = 0.1
+        self.I = 0.2
+        self.D = 0.0
         self.motor_max_val = 1900
         self.motor_min_val = 1100
         self.Correction_yaw = 1500
@@ -57,6 +57,8 @@ class VisualServoing(Node):
         self.previous_error = [0.0, 0.0]
         self.error_integral = [0.0, 0.0]
         self.error_derivative = [0.0, 0.0]
+
+
 
 
     def segment_callback(self, msg):
@@ -104,7 +106,7 @@ class VisualServoing(Node):
         else:
 
             error = self.desired_point - self.tracked_point
-            error[1] =0.0
+            # error[1] =0.0
             error_array_msg = Float64MultiArray()
             error_array_msg.data = error.tolist()
             self.error_publisher.publish(error_array_msg)
@@ -180,8 +182,8 @@ class VisualServoing(Node):
         pitch_left_right = self.mapValueScalSat(cmd_vel.angular.y)
         yaw_left_right = self.mapValueScalSat(-cmd_vel.angular.z)
 
-        # self.get_logger().info(f"Yaw speed: {cmd_vel.angular.z}")
-        # self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
+        self.get_logger().info(f"Yaw speed: {cmd_vel.angular.z}")
+        self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
 
         # Send commands to robot
         self.setOverrideRCIN(pitch_left_right, roll_left_right, ascend_descend,

@@ -1,0 +1,9 @@
+<launch>		
+	<group> 
+	  <arg name="namespace" default="bluerov2"/>
+
+	<node pkg="autonomous_rov" exec="state_machine" name="state_machine" namespace="$(var namespace)" output="screen">
+	</node>		
+		
+	</group>
+</launch>	

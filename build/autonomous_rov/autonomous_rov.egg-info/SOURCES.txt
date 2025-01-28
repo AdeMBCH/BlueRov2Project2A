@@ -21,6 +21,7 @@ autonomous_rov/visual_servoing_essai.py
 config/xbox.config.yaml
 launch/run_gamepad.launch
 launch/run_mavros.launch
+launch/run_state_machine.launch
 launch/run_video.launch
 launch/run_visual_servo.launch
 launch/run_yolo_video.launch

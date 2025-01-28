@@ -27,6 +27,7 @@ setup(
     entry_points={
     'console_scripts': [
         'visual_servoing = autonomous_rov.visual_servoing_essai:main',
+        'state_machine = autonomous_rov.state_machine_visual_servo:main',
         'video = autonomous_rov.video:main',
         'pinger_node = autonomous_rov.pinger_node:main',
         'image_processing_tracker = autonomous_rov.image_processing_tracker:main'
