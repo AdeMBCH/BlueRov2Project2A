@@ -5,6 +5,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64MultiArray, Int16, Float64, Empty, String
 from mavros_msgs.msg import OverrideRCIn, Mavlink
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 import time
 
 class VisualServoing(Node):
@@ -12,14 +13,17 @@ class VisualServoing(Node):
         super().__init__("visual_servoing_node")
         self.get_logger().info("This node is named visual_servoing_node")
 
+        qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1)
+
         #Subscribers creation
         self.desired_point_sub = self.create_subscription(Float64MultiArray,'/bluerov2/desired_point', self.desired_point_callback,10)
         self.tracked_point_sub = self.create_subscription(Float64MultiArray,'/bluerov2/tracked_point',self.tracked_point_callback,10)
-        self.sub_segment = self.create_subscription(
-            Float64MultiArray,
-            'tracked_segment',
-            self.segment_callback,
-            10)
+        self.sub_segment = self.create_subscription(Float64MultiArray,'tracked_segment',self.segment_callback,10)
+        self.subping = self.create_subscription(Float64MultiArray, "ping1d/data", self.pingerCallback,qos_profile=qos_profile)
+
         self.get_logger().info("Subscriptions succesfully created")
 
         # Publishers
@@ -35,6 +39,8 @@ class VisualServoing(Node):
         self.get_logger().info("Publishers succesfully created")
 
 
+
+
         # Adding default values to __init__
 
         self.desired_point = None
@@ -44,9 +50,9 @@ class VisualServoing(Node):
 
         self.tolerance_error = 0.10
         self.Z = 1.0
-        self.P = 4.0
-        self.I = 0.4
-        self.D = 0.1
+        self.P = 2.0
+        self.I = 0.0
+        self.D = 0.0
         self.motor_max_val = 1900
         self.motor_min_val = 1100
         self.Correction_yaw = 1500
@@ -64,6 +70,15 @@ class VisualServoing(Node):
         self.search_mode = "spiral"
         self.start_time = time.time()
         self.timeout_duration = 1.0
+
+        self.pinger_confidence = 100
+        self.pinger_distance = 10
+        self.max_pinger_distance = 0
+
+    def pingerCallback(self, msg):
+        self.pinger_distance = msg.data[0]
+        self.pinger_confidence = msg.data[1]
+        self.get_logger().info("pinger_distance =" + str(self.pinger_distance))
 
     def update_state(self):
         if self.state == "SEARCHING":
@@ -305,7 +320,15 @@ class VisualServoing(Node):
         msg_override.channels[4] = channel_forward   # Forward
         msg_override.channels[5] = channel_lateral   # Lateral
 
-        #self.overrideRCIN_publisher.publish(msg_override)
+        if self.pinger_distance > self.max_pinger_distance and self.pinger_confidence > 80:
+            msg_override.channels[0] = 1500  # Roll
+            msg_override.channels[1] = 1500  # Pitch
+            msg_override.channels[2] = 1500  # Throttle
+            msg_override.channels[3] = 1600  # Yaw
+            msg_override.channels[4] = 1500  # Forward
+            msg_override.channels[5] = 1500  # Lateral
+
+        # self.overrideRCIN_publisher.publish(msg_override)
 
 
 def main(args=None):

@@ -2,7 +2,51 @@
 
 This project implements a visual servoing system for an autonomous ROV using ROS 2 Iron. The project includes an object tracking algorithm and a visual control system to adjust the robot's movements based on tracked points in images.
 
-## Project Structure
+## Prerequisites
+
+- **ROS 2 Iron** (compatible with newer ROS 2 versions)
+- **OpenCV** for image processing
+- **cv_bridge** for conversion between OpenCV and ROS messages
+- **numpy**
+- **mavros_msgs**
+- **geometry_msgs**
+- **std_msgs**
+
+## Install Dependencies
+
+Ensure all dependencies are installed before compiling:
+
+```bash
+cd ~/ros2_ws
+colcon build 
+```
+
+## Source the Workspace
+
+Before launching the nodes, source your ROS 2 workspace:
+
+```bash
+source ~/ros2_ws/install/setup.bash
+```
+
+## Launching the Nodes
+
+### 1. Launch the Image Processing Node
+
+The `image_processing_tracker` node is responsible for receiving camera images and processing them to detect and track an object.
+
+```bash
+ros2 launch autonomous_rov run_video.launch.py
+```
+
+### 2. State Machine 
+The `state_machine` integrates the logics from `visual_servoing_node` into a finite state machine to get a full control of the ROV whatever the situation is.
+
+```bash
+ros2 launch autonomous_rov run_state_machine.launch
+```
+
+## Project Structure : image_processing_tracker.py
 
 - **image_processing_tracker.py**: This node performs image processing, including object detection and point tracking. **Make sure the camera topic is correct. You can check it with the following command:**
   
@@ -24,61 +68,7 @@ This project implements a visual servoing system for an autonomous ROV using ROS
 - **visual_servoing_node.py**: This node implements the visual servoing system, computing the error between the tracked point and the desired point and adjusting the robot's position accordingly. **It controls the ROV's lateral movements, yaw, and forward motion using a proportional controller.**
 - **launch**: Directory containing launch files to execute the nodes.
 
-## Prerequisites
-
-- **ROS 2 Iron** (compatible with newer ROS 2 versions)
-- **OpenCV** for image processing
-- **cv_bridge** for conversion between OpenCV and ROS messages
-
-## Install Dependencies
-
-Ensure all dependencies are installed before compiling:
-
-```bash
-cd ~/ros2_ws
-colcon build --symlink-install
-```
-
-## Source the Workspace
-
-Before launching the nodes, source your ROS 2 workspace:
-
-```bash
-source ~/ros2_ws/install/setup.bash
-```
-
-## Launching the Nodes
-
-### 1. Launch the Image Processing Node
-
-The `image_processing_tracker` node is responsible for receiving camera images and processing them to detect and track an object.
-
-```bash
-ros2 launch autonomous_rov image_process.launch.py
-```
-
-### 2. Launch the Visual Servoing Node
-
-The `visual_servoing_node` receives tracking information and calculates motion commands for the robot based on the error.
-
-```bash
-ros2 launch autonomous_rov visual_servoing.launch.py
-```
-
-### 3. State Machine 
-
-# README: Visual Servoing for BlueROV2 in ROS2
-
-## Introduction
-This project implements a **visual servoing** control system for the BlueROV2 using **ROS2**. The node processes image-based feedback to guide the underwater robot towards a target (buoy) while handling detection loss scenarios.
-
-## Dependencies
-Ensure you have the following dependencies installed:
-- **ROS2 (Humble or Foxy recommended)**
-- **numpy**
-- **mavros_msgs**
-- **geometry_msgs**
-- **std_msgs**
+## Project Structure : visual_servoing_essai.py
 
 ## Node Description
 The primary node is **visual_servoing_node**, which subscribes to vision data, computes control errors, and publishes velocity commands for robot movement.
@@ -103,7 +93,8 @@ The primary node is **visual_servoing_node**, which subscribes to vision data, c
 | `visual_servoing/cam_speed` | `Twist` | Camera movement velocity commands. |
 | `visual_servoing/robot_speed` | `Twist` | Robot movement velocity commands. |
 
-## State Machine
+## ## Project Structure : state_machine_visual_servo.py
+
 The system has three main states:
 1. **SEARCHING** - The buoy is not detected, and the robot follows a search pattern.
 2. **TRACKING** - The buoy is detected, and the robot follows it using visual servoing.
@@ -147,14 +138,7 @@ The system has three main states:
 | `THRESHOLD_WIDTH` | Min size before advancing | 0.12 |
 
 
-## Launch File Descriptions
-
-The project includes two main launch files:
-
-- **visual_servoing.launch.py**: Launches the visual servoing and image processing nodes.
-- **image_processing.launch.py**: Allows specifying the camera topic and launches only the necessary nodes for image processing.
-
-## Troubleshooting
+# Troubleshooting
 
 ### Nodes Are Not Connected
 

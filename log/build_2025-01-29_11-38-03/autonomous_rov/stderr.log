@@ -1,0 +1,5 @@
+  File "/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/image_processing_tracker.py", line 6
+    from sensor_msgs.msg import Image, CompressedImage,   # need to import CompressedImage to fit the topic used by bags
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: trailing comma not allowed without surrounding parentheses
+

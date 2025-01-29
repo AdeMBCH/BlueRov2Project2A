@@ -1,0 +1,6 @@
+source;share/ping_sonar_ros/hook/pythonpath.ps1
+source;share/ping_sonar_ros/hook/pythonpath.dsv
+source;share/ping_sonar_ros/hook/pythonpath.sh
+source;share/ping_sonar_ros/hook/ament_prefix_path.ps1
+source;share/ping_sonar_ros/hook/ament_prefix_path.dsv
+source;share/ping_sonar_ros/hook/ament_prefix_path.sh

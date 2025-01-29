@@ -3,7 +3,8 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray
-from sensor_msgs.msg import Image, CompressedImage  # need to import CompressedImage to fit the topic used by bags
+from sensor_msgs.msg import Image, CompressedImage   # need to import CompressedImage to fit the topic used by bags
+from mavros_msgs.msg import CameraImageCaptured
 import numpy as np
 import cv2
 from . import camera_parameters as cam
@@ -90,9 +91,15 @@ class ImageProcessingNode(Node):
         self.pub_desired_point = self.create_publisher(Float64MultiArray, 'desired_point', 10)
         self.pub_tracked_segment = self.create_publisher(Float64MultiArray, 'tracked_segment', 10)
 
+        # self.subscription = self.create_subscription(
+        #     CompressedImage,
+        #     '/br4/raspicam_node/image/compressed',
+        #     self.cameracallback,
+        #     10)
+
         self.subscription = self.create_subscription(
-            CompressedImage,
-            '/br4/raspicam_node/image/compressed',
+            CameraImageCaptured,
+            '/bluerov2/camera/image_captured',
             self.cameracallback,
             10)
 
@@ -110,10 +117,10 @@ class ImageProcessingNode(Node):
 
         try:
             # Si vous utilisez des images non compressées (sensor_msgs/Image)
-            # image_np = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            image_np = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
-            # Si vous utilisez des images compressées (sensor_msgs/CompressedImage)
-            image_np = self.bridge.compressed_imgmsg_to_cv2(msg)
+            # # Si vous utilisez des images compressées (sensor_msgs/CompressedImage)
+            # image_np = self.bridge.compressed_imgmsg_to_cv2(msg)
 
         except Exception as e:
             self.get_logger().error(f"Erreur lors de la conversion de l'image: {e}")
