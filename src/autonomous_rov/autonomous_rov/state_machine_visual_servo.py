@@ -1,5 +1,11 @@
 import rclpy
 import numpy as np
+import traceback
+
+from struct import pack, unpack
+from sensor_msgs.msg import Joy, Imu,FluidPressure, LaserScan
+from mavros_msgs.srv import CommandLong, SetMode, StreamRate
+from mavros_msgs.srv import EndpointAdd
 from duplicity.config import current_time
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -7,6 +13,7 @@ from std_msgs.msg import Float64MultiArray, Int16, Float64, Empty, String
 from mavros_msgs.msg import OverrideRCIn, Mavlink
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 import time
+
 
 class VisualServoing(Node):
     def __init__(self):
@@ -50,9 +57,11 @@ class VisualServoing(Node):
 
         self.tolerance_error = 0.10
         self.Z = 1.0
-        self.P = 2.0
-        self.I = 0.0
-        self.D = 0.0
+
+        self.P = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 2.0  ])
+        self.I = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0001])
+        self.D = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.001])
+
         self.motor_max_val = 1900
         self.motor_min_val = 1100
         self.Correction_yaw = 1500
@@ -73,7 +82,7 @@ class VisualServoing(Node):
 
         self.pinger_confidence = 100
         self.pinger_distance = 10
-        self.max_pinger_distance = 0
+        self.max_pinger_distance = 1.0
 
     def pingerCallback(self, msg):
         self.pinger_distance = msg.data[0]
@@ -146,7 +155,7 @@ class VisualServoing(Node):
 
     def forward_move(self, move):
         if move == True:
-            self.thruttle = 1550
+            self.thruttle = 1600
             self.get_logger().info("La bouée est trop petite → Le robot doit avancer.")
         else:
             self.thruttle = 1500
@@ -267,8 +276,8 @@ class VisualServoing(Node):
         # self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
 
         # Send commands to robot
-        self.setOverrideRCIN(pitch_left_right, roll_left_right, ascend_descend,
-                              yaw_left_right, forward_reverse, lateral_left_right)
+        self.setOverrideRCIN(1500, 1500, 1500,
+                              yaw_left_right, 1500, 1500)
 
         self.get_logger().info(f' Published new command to RCIN :'
                                f' yaw : {yaw_left_right}, '   #need to check
@@ -320,15 +329,15 @@ class VisualServoing(Node):
         msg_override.channels[4] = channel_forward   # Forward
         msg_override.channels[5] = channel_lateral   # Lateral
 
-        if self.pinger_distance > self.max_pinger_distance and self.pinger_confidence > 80:
-            msg_override.channels[0] = 1500  # Roll
-            msg_override.channels[1] = 1500  # Pitch
-            msg_override.channels[2] = 1500  # Throttle
-            msg_override.channels[3] = 1600  # Yaw
-            msg_override.channels[4] = 1500  # Forward
-            msg_override.channels[5] = 1500  # Lateral
+        # if self.pinger_distance > self.max_pinger_distance and self.pinger_confidence > 95:
+        #     msg_override.channels[0] = 1500  # Roll
+        #     msg_override.channels[1] = 1500  # Pitch
+        #     msg_override.channels[2] = 1500  # Throttle
+        #     msg_override.channels[3] = 1600  # Yaw
+        #     msg_override.channels[4] = 1500  # Forward
+        #     msg_override.channels[5] = 1500  # Lateral
 
-        # self.overrideRCIN_publisher.publish(msg_override)
+        self.overrideRCIN_publisher.publish(msg_override)
 
 
 def main(args=None):

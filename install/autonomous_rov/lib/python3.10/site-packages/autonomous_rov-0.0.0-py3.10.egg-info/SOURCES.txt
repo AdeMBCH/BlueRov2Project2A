@@ -14,6 +14,7 @@ autonomous_rov/camera_parameters.py
 autonomous_rov/image_processing_tracker.py
 autonomous_rov/image_processing_yolo.py
 autonomous_rov/listenerMIR.py
+autonomous_rov/listener_visual_servoing.py
 autonomous_rov/pinger_node.py
 autonomous_rov/state_machine_visual_servo.py
 autonomous_rov/video.py
