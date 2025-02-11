@@ -19,6 +19,7 @@ autonomous_rov/pinger_node.py
 autonomous_rov/state_machine_visual_servo.py
 autonomous_rov/video.py
 autonomous_rov/visual_servoing_essai.py
+autonomous_rov/yolo_try.py
 config/xbox.config.yaml
 launch/run_gamepad.launch
 launch/run_mavros.launch

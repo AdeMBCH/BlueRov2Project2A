@@ -125,17 +125,17 @@ The system has three main states:
 - Determines whether the robot should move forward based on the target's size in the image.
 
 ## PID Control Parameters
-| Parameter | Description | Default Value |
-|------------|--------------------|---------------|
-| `P` | Proportional gain | 4.0 |
-| `I` | Integral gain | 0.4 |
-| `D` | Derivative gain | 0.1 |
-| `Z` | Depth gain | 1.0 |
-| `motor_max_val` | Max motor signal | 1900 |
-| `motor_min_val` | Min motor signal | 1100 |
-| `Correction_yaw` | Base yaw correction | 1500 |
-| `Correction_depth` | Base depth correction | 1500 |
-| `THRESHOLD_WIDTH` | Min size before advancing | 0.12 |
+| Parameter | Description | Default Value   |
+|------------|--------------------|-----------------|
+| `P` | Proportional gain | 0 0 0 0 0 2.5   |
+| `I` | Integral gain | 0 0 0 0 0 0.0001 |
+| `D` | Derivative gain | 0 0 0 0 0 0.001 |
+| `Z` | Depth gain | 1.0             |
+| `motor_max_val` | Max motor signal | 1900            |
+| `motor_min_val` | Min motor signal | 1100            |
+| `Correction_yaw` | Base yaw correction | 1500            |
+| `Correction_depth` | Base depth correction | 1500            |
+| `THRESHOLD_WIDTH` | Min size before advancing | 0.12            |
 
 
 # Troubleshooting
@@ -153,7 +153,7 @@ ros2 topic list
 - Make sure the camera is properly configured and that the corresponding topic is correctly published.
 - Modify the image conversion according to the format used in your ROS 2 pipeline.
 
-# YOLOv5 Integration with ROS2 for Buoy Detection
+# YOLOv5Nano Integration with ROS2 for Buoy Detection
 
 ## **Prerequisites**
 
@@ -186,7 +186,7 @@ ros2 topic list
    - Place your images and YOLO-format annotations (.txt files) into the corresponding directories:
      
 ```
-~/ros2_ws/src/autonomous_rov/yoloV5/
+~/ros2_ws/src/autonomous_rov/yoloV5/data/images/
      ├── train/
      │   ├── image1.jpg
      │   ├── image1.txt
@@ -201,19 +201,15 @@ ros2 topic list
    - Create a file named `data.yaml` in the `yoloV5` folder with the following content:
      
 ```yaml
-     train: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/train
-     val: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/valid
-     test: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/test
+     train: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/data/images/train
+     val: /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/data/images/valid
 
-     nc: 6
-     names:
-       - blue_ball
-       - green-buoy
-       - orange-buoy
-       - red-buoy
-       - water_target
-       - yellow-buoy
+
+   names:
+     0: buoy
 ```
+The argument "names" represents the output class predicted by the CNN. Here we only detect buoys.
+
 ---
 
 ## **Train YOLOv5**
@@ -227,16 +223,16 @@ ros2 topic list
 2. Run the training command:
    
 ```bash
-   python3 train.py --img 640 --batch 16 --epochs 50 --data /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/data.yaml --weights yolov5s.pt
+   python3 train.py --img 640 --batch 16 --epochs 50 --data /home/projet_sysmer/ros2_ws/src/autonomous_rov/yoloV5/data/data.yaml --weights yolov5n.pt
 ```
-
+We use YoloV5Nano for this case. It is fast and accurate enough for our work. If your tasks is more sophisticated, upgrade the model to a more powerful version.
 3. Monitor training:
    - Training results (including the best model weights) will be saved in:
      
 ```
 runs/train/exp/weights/
 ```
-   - The best model is saved as `best.pt`.
+   - The best model is saved as `best.pt`. This is the one we will be using because there is an early stopping implemented in the training. It means that the learning will automatically stop after detecting a non positive progression or a overfitting case.
 
 4. Optional: Use TensorBoard for real-time monitoring:
    
@@ -249,7 +245,9 @@ runs/train/exp/weights/
 ## **Testing**
 
 Once the training is complete, the generated `best.pt` model can be used directly in your ROS2 node for real-time buoy detection.
-
+```
+python3 detect.py --img /path/to/your/img
+```
 ## **Acknowledgements**
 
 - YOLOv5 by Ultralytics: [GitHub Repository](https://github.com/ultralytics/yolov5)

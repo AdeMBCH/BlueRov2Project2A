@@ -127,12 +127,12 @@ class MyVisualServoingNode(Node):
         self.pinger_distance = 10
         self.max_pinger_distance = 1.0
 
+
         ##### timer for auto mode #####
         timer_period = 0.05  # 50 msec - 20 Hz
         self.auto_timer = self.create_timer(timer_period, self.auto_mode_callback)
 
     def auto_mode_callback(self):
-        # On vérifie que le mode automatique est activé (par exemple, self.set_mode[1])
         if self.set_mode[1]:
             self.update_state()
 
@@ -165,8 +165,10 @@ class MyVisualServoingNode(Node):
         if len(msg.data) >= 2:
             self.tracked_point = np.array(msg.data)
 
+
             if self.desired_point is None:
                 return
+
 
             self.last_known_position = self.tracked_point
 

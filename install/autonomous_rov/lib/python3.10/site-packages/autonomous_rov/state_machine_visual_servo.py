@@ -58,8 +58,8 @@ class VisualServoing(Node):
         self.tolerance_error = 0.10
         self.Z = 1.0
 
-        self.P = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 2.0])
-        self.I = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.001])
+        self.P = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 2.0  ])
+        self.I = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0001])
         self.D = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.001])
 
         self.motor_max_val = 1900

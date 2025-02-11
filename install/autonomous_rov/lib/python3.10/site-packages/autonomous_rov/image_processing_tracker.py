@@ -90,12 +90,12 @@ class ImageProcessingNode(Node):
         self.pub_tracked_point = self.create_publisher(Float64MultiArray, 'tracked_point', 10)
         self.pub_desired_point = self.create_publisher(Float64MultiArray, 'desired_point', 10)
         self.pub_tracked_segment = self.create_publisher(Float64MultiArray, 'tracked_segment', 10)
-
-        self.subscription = self.create_subscription(
-            CompressedImage,
-            '/br4/raspicam_node/image/compressed',
-            self.cameracallback,
-            10)
+        #
+        # self.subscription = self.create_subscription(
+        #     CompressedImage,
+        #     '/br4/raspicam_node/image/compressed',
+        #     self.cameracallback,
+        #     10)
 
         self.subscription = self.create_subscription(
             Image,

@@ -1,6 +1,7 @@
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/listenerMIR.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/image_processing_yolo.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/video.py
+/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/yolo_try.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/pinger_node.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/listener_visual_servoing.py
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/camera_parameters.py
@@ -11,6 +12,7 @@
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/listenerMIR.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/image_processing_yolo.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/video.cpython-310.pyc
+/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/yolo_try.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/pinger_node.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/listener_visual_servoing.cpython-310.pyc
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov/__pycache__/camera_parameters.cpython-310.pyc
@@ -38,6 +40,7 @@
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov-0.0.0-py3.10.egg-info/top_level.txt
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/python3.10/site-packages/autonomous_rov-0.0.0-py3.10.egg-info/entry_points.txt
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov/image_processing_tracker
+/home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov/image_processing_yolo
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov/listenerMIR
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov/pinger_node
 /home/projet_sysmer/ros2_ws/install/autonomous_rov/lib/autonomous_rov/state_machine
