@@ -4,11 +4,12 @@ from rclpy.node import Node
 import cv2
 import gi
 import numpy as np
-from sensor_msgs.msg import Image #new This line imports the ROS 2 message type 
-from cv_bridge import CvBridge  #new converting between ROS Image messages and OpenCV images (numpy arrays).
+from sensor_msgs.msg import Image  # new This line imports the ROS 2 message type
+from cv_bridge import CvBridge  # new converting between ROS Image messages and OpenCV images (numpy arrays).
 
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
+
 
 class Controller(Node):
     """BlueRov video capture class constructor
@@ -23,41 +24,41 @@ class Controller(Node):
         video_source (string): Udp source ip and port
     """
 
-    g   = 9.81      # m.s^-2 gravitational acceleration 
-    p0  = 103425    # Surface pressure in Pascal
-    rho = 1000      # kg/m^3  water density
+    g = 9.81  # m.s^-2 gravitational acceleration
+    p0 = 103425  # Surface pressure in Pascal
+    rho = 1000  # kg/m^3  water density
 
     def __init__(self):
         super().__init__("video")
 
-        self.declare_parameter("port", 5600) 
+        self.declare_parameter("port", 5600)
 
-        self.port               = self.get_parameter("port").value
-        self._frame             = None
-        self.video_source       = 'udpsrc port={}'.format(self.port)
-        self.video_codec        = '! application/x-rtp, payload=96 ! rtph264depay ! h264parse ! avdec_h264'
-        self.video_decode       = '! decodebin ! videoconvert ! video/x-raw,format=(string)BGR ! videoconvert'
-        self.video_sink_conf    = '! appsink emit-signals=true sync=false max-buffers=2 drop=true'
+        self.port = self.get_parameter("port").value
+        self._frame = None
+        self.video_source = 'udpsrc port={}'.format(self.port)
+        self.video_codec = '! application/x-rtp, payload=96 ! rtph264depay ! h264parse ! avdec_h264'
+        self.video_decode = '! decodebin ! videoconvert ! video/x-raw,format=(string)BGR ! videoconvert'
+        self.video_sink_conf = '! appsink emit-signals=true sync=false max-buffers=2 drop=true'
 
-        self.video_pipe         = None
-        self.video_sink         = None
+        self.video_pipe = None
+        self.video_sink = None
 
         # font
-        self.font               = cv2.FONT_HERSHEY_PLAIN
+        self.font = cv2.FONT_HERSHEY_PLAIN
 
-        Gst.init() 
+        Gst.init()
 
         # Initialize CvBridge
-        self.bridge = CvBridge() # initializes an instance of CvBridge and assigns it to self.bridge. 
+        self.bridge = CvBridge()  # initializes an instance of CvBridge and assigns it to self.bridge.
 
         # Create a publisher for the image
-        self.image_publisher = self.create_publisher(Image, 'camera/image', 10) #image_publisher: publisher name
-        #publishes messages of type Image to the topic 'bluerov2/camera/image'.(10): the queue size of the publisher.
+        self.image_publisher = self.create_publisher(Image, 'camera/image', 10)  # image_publisher: publisher name
+        # publishes messages of type Image to the topic 'bluerov2/camera/image'.(10): the queue size of the publisher.
 
         self.run()
 
         # Start update loop
-        self.create_timer(0.033, self.update)    #0.01 milliseconds update 100 Hz / 60 Hz 0.0167 now 30 hz 
+        self.create_timer(0.033, self.update)  # 0.01 milliseconds update 100 Hz / 60 Hz 0.0167 now 30 hz
 
     def start_gst(self, config=None):
         """ Start gstreamer pipeline and sink
@@ -142,25 +143,25 @@ class Controller(Node):
         self._frame = new_frame
 
         return Gst.FlowReturn.OK
-    
-    def update(self):        
+
+    def update(self):
         if not self.frame_available():
             return
 
         frame = self.frame()
-        width = int(1920/2)#1.5
-        height = int(1080/2)#1.5
+        width = int(1920 / 2)  # 1.5
+        height = int(1080 / 2)  # 1.5
         dim = (width, height)
-        img = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)   
+        img = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
 
-        #self.draw_gui(img, width, height)        
+        # self.draw_gui(img, width, height)
 
         # Convert OpenCV image to ROS 2 Image message
-        #This line converts the OpenCV image img (which is a numpy array) into a ROS 2 Image message (img_msg).
-        #The encoding='bgr8' parameter specifies the color encoding of the image (BGR format with 8 bits per channel).
+        # This line converts the OpenCV image img (which is a numpy array) into a ROS 2 Image message (img_msg).
+        # The encoding='bgr8' parameter specifies the color encoding of the image (BGR format with 8 bits per channel).
         img_msg = self.bridge.cv2_to_imgmsg(img, encoding='bgr8')
         # Publish the image message
-        #This line publishes the img_msg (which now contains the image data)
+        # This line publishes the img_msg (which now contains the image data)
         # to the 'bluerov2/camera/image' topic using self.image_publisher.
         self.image_publisher.publish(img_msg)
 
@@ -168,12 +169,12 @@ class Controller(Node):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             self.destroy_node()
 
-    def draw_gui(self, img, width, height):        
-        img = cv2.rectangle(img,(0, height-100),(520,height),(0,0,0),-1)
-        
+    def draw_gui(self, img, width, height):
+        img = cv2.rectangle(img, (0, height - 100), (520, height), (0, 0, 0), -1)
+
 
 def main(args=None):
-    rclpy.init(args=args)    
+    rclpy.init(args=args)
     node = Controller()
     try:
         rclpy.spin(node)
@@ -182,6 +183,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

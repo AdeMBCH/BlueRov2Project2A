@@ -281,8 +281,8 @@ class VisualServoing(Node):
 
         self.get_logger().info(f' Published new command to RCIN :'
                                f' yaw : {yaw_left_right}, '   #need to check
-                               f' thruttle : {self.thruttle}, '     #okay
-                               f' lateral lr : {lateral_left_right}')    #okay
+                               f' thruttle : {1500}, '     #okay
+                               f' lateral lr : {1500}')    #okay
 
     def transform_velocity(self, cam_speed, H):
         # Transform camera velocity to robot velocity using homogeneous transform H
@@ -321,13 +321,27 @@ class VisualServoing(Node):
 
     def setOverrideRCIN(self, channel_pitch, channel_roll, channel_throttle, channel_yaw, channel_forward, channel_lateral):
         msg_override = OverrideRCIn()
-        msg_override.channels = [1500] * 8
-        msg_override.channels[0] = channel_roll      # Roll
-        msg_override.channels[1] = channel_pitch     # Pitch
-        msg_override.channels[2] = channel_throttle  # Throttle
-        msg_override.channels[3] = channel_yaw       # Yaw
-        msg_override.channels[4] = channel_forward   # Forward
-        msg_override.channels[5] = channel_lateral   # Lateral
+        msg_override.channels = [1500] * 18
+        msg_override.channels[0] = np.uint(channel_roll)      # Roll
+        msg_override.channels[1] = np.uint(channel_pitch)   # Pitch
+        msg_override.channels[2] = np.uint(channel_throttle)  # Throttle
+        msg_override.channels[3] = np.uint(channel_yaw)      # Yaw
+        msg_override.channels[4] = np.uint(channel_forward)   # Forward
+        msg_override.channels[5] = np.uint(channel_lateral)   # Lateral
+        msg_override.channels[6] = 1500
+        msg_override.channels[7] = 1500
+        msg_override.channels[8] = 0
+        msg_override.channels[9] = 0
+        msg_override.channels[10] = 0
+        msg_override.channels[11] = 0
+        msg_override.channels[12] = 0
+        msg_override.channels[13] = 0
+        msg_override.channels[14] = 0
+        msg_override.channels[15] = 0
+        msg_override.channels[16] = 0
+        msg_override.channels[17] = 0
+
+
 
         # if self.pinger_distance > self.max_pinger_distance and self.pinger_confidence > 95:
         #     msg_override.channels[0] = 1500  # Roll

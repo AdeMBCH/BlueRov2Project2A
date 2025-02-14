@@ -7,7 +7,6 @@ from sensor_msgs.msg import Image, CompressedImage   # need to import Compressed
 from mavros_msgs.msg import CameraImageCaptured
 import numpy as np
 import cv2
-from . import camera_parameters as cam
 from cv_bridge import CvBridge
 
 

@@ -32,7 +32,8 @@ setup(
         'pinger_node = autonomous_rov.pinger_node:main',
         'image_processing_tracker = autonomous_rov.image_processing_tracker:main',
         'image_processing_yolo= autonomous_rov.image_processing_yolo:main',
-        'listenerMIR = autonomous_rov.listenerMIR:main'
+        'listenerMIR = autonomous_rov.listenerMIR:main',
+        'listenerVS = autonomous_rov.listener_visual_servoing:main'
         ],       
         
     },

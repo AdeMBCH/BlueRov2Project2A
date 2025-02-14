@@ -261,23 +261,23 @@ class MyPythonNode(Node):
         self.setOverrideRCIN(pitch_left_right, roll_left_right, ascend_descend, yaw_left_right, forward_reverse,
                              lateral_left_right)
 
-    # def setOverrideRCIN(self, channel_pitch, channel_roll, channel_throttle, channel_yaw, channel_forward,
-    #                     channel_lateral):
-    #     # This function replaces setservo for motor commands.
-    #     # It overrides Rc channels inputs and simulates motor controls.
-    #     # In this case, each channel manages a group of motors not individually as servo set
-    #
-    #     msg_override = OverrideRCIn()
-    #     msg_override.channels[0] = np.uint(channel_pitch)  # pulseCmd[4]--> pitch
-    #     msg_override.channels[1] = np.uint(channel_roll)  # pulseCmd[3]--> roll
-    #     msg_override.channels[2] = np.uint(channel_throttle)  # pulseCmd[2]--> heave
-    #     msg_override.channels[3] = np.uint(channel_yaw)  # pulseCmd[5]--> yaw
-    #     msg_override.channels[4] = np.uint(channel_forward)  # pulseCmd[0]--> surge
-    #     msg_override.channels[5] = np.uint(channel_lateral)  # pulseCmd[1]--> sway
-    #     msg_override.channels[6] = 1500
-    #     msg_override.channels[7] = 1500
-    #
-    #     self.pub_msg_override.publish(msg_override)
+    def setOverrideRCIN(self, channel_pitch, channel_roll, channel_throttle, channel_yaw, channel_forward,
+                        channel_lateral):
+        # This function replaces setservo for motor commands.
+        # It overrides Rc channels inputs and simulates motor controls.
+        # In this case, each channel manages a group of motors not individually as servo set
+
+        msg_override = OverrideRCIn()
+        msg_override.channels[0] = np.uint(channel_pitch)  # pulseCmd[4]--> pitch
+        msg_override.channels[1] = np.uint(channel_roll)  # pulseCmd[3]--> roll
+        msg_override.channels[2] = np.uint(channel_throttle)  # pulseCmd[2]--> heave
+        msg_override.channels[3] = np.uint(channel_yaw)  # pulseCmd[5]--> yaw
+        msg_override.channels[4] = np.uint(channel_forward)  # pulseCmd[0]--> surge
+        msg_override.channels[5] = np.uint(channel_lateral)  # pulseCmd[1]--> sway
+        msg_override.channels[6] = 1500
+        msg_override.channels[7] = 1500
+
+        self.pub_msg_override.publish(msg_override)
 
     def mapValueScalSat(self, value):
         # Correction_Vel and joy between -1 et 1

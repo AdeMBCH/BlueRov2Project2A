@@ -67,15 +67,15 @@ class MyVisualServoingNode(Node):
         self.get_logger().info("Subscriptions done.")
 
         # variables
-        self.set_mode = [0] * 3
+        self.set_mode = [0] * 2
         self.set_mode[0] = True  # Mode manual
-        self.set_mode[1] = False  # Mode automatic without correction
-        self.set_mode[2] = False  # Mode with correction
+        self.set_mode[1] = False  # Mode automatic
 
         # Conditions
         self.init_a0 = True
         self.init_p0 = True
         self.arming = False
+        self.move = False
 
         self.angle_roll_ajoyCallback0 = 0.0
         self.angle_pitch_a0 = 0.0
@@ -102,9 +102,11 @@ class MyVisualServoingNode(Node):
 
         self.tolerance_error = 0.10
         self.Z = 1.0
-        self.P = 3.0
-        self.I = 0.0
-        self.D = 0.0
+
+        self.P = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 2.0  ])
+        self.I = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0001])
+        self.D = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.001])
+
         self.motor_max_val = 1900
         self.motor_min_val = 1100
         self.Correction_yaw = 1500
@@ -127,9 +129,13 @@ class MyVisualServoingNode(Node):
         self.pinger_distance = 10
         self.max_pinger_distance = 1.0
 
+        ### values for cam and light control
+
+        self.cam_rc_value = 1500 # from 1100 to 1900, neutral position is at 1500
+        self.light_rc_value = 1100 # from 1100 to 1900, light off is 1100
 
         ##### timer for auto mode #####
-        timer_period = 0.05  # 50 msec - 20 Hz
+        timer_period = 0.10  # 50 msec - 20 Hz
         self.auto_timer = self.create_timer(timer_period, self.auto_mode_callback)
 
     def auto_mode_callback(self):
@@ -137,17 +143,20 @@ class MyVisualServoingNode(Node):
             self.update_state()
 
     def segment_callback(self, msg):
-        x1, y1, x2, y2 = msg.data
-        current_width = x2 - x1
+        if self.set_mode[1]:
+            x1, y1, x2, y2 = msg.data
+            current_width = x2 - x1
 
-        if current_width < self.THRESHOLD_WIDTH:
-            move = True
+            if current_width < self.THRESHOLD_WIDTH:
+                self.move = True
+            else:
+                self.move = False
+            self.forward_move()
         else:
-            move = False
-        self.forward_move(move)
+            return
 
-    def forward_move(self, move):
-        if move == True:
+    def forward_move(self):
+        if self.move == True:
             self.thruttle = 1600
             self.get_logger().info("La bouée est trop petite → Le robot doit avancer.")
         else:
@@ -168,7 +177,6 @@ class MyVisualServoingNode(Node):
 
             if self.desired_point is None:
                 return
-
 
             self.last_known_position = self.tracked_point
 
@@ -244,13 +252,15 @@ class MyVisualServoingNode(Node):
         # self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
 
         # Send commands to robot
+        light_rc = self.light_rc_value
+        cam_rc = self.cam_rc_value
         self.setOverrideRCIN(1500, 1500, 1500,
-                              yaw_left_right, self.thruttle, lateral_left_right)
+                              yaw_left_right, 1500, 1500, light_rc, cam_rc)
 
         self.get_logger().info(f' Published new command to RCIN :'
                                f' yaw : {yaw_left_right}, '   #need to check
-                               f' thruttle : {self.thruttle}, '     #okay
-                               f' lateral lr : {lateral_left_right}')    #okay
+                               f' thruttle : {1500}, '     #okay
+                               f' lateral lr : {1500}')    #okay
 
     def compute_error(self):
         if self.desired_point is None or self.tracked_point is None:
@@ -413,11 +423,32 @@ class MyVisualServoingNode(Node):
         # Joystick buttons
         btn_arm = data.buttons[7]  # Start button
         btn_disarm = data.buttons[6]  # Back button
-        btn_manual_mode = data.buttons[3]  # Y button
         btn_automatic_mode = data.buttons[2]  # X button
-        btn_corrected_mode = data.buttons[0]  # A button
+        btn_manual_mode = data.buttons[0]  # A button
+        btn_light_up = data.buttons[4]
+        btn_light_down = data.buttons[5]
+        btn_cam_tilt_up = data.buttons[1]
+        btn_cam_tilt_down = data.buttons[3]
 
         # Disarming when Back button is pressed
+        if btn_cam_tilt_up == 1 and btn_cam_tilt_down == 0:
+            self.cam_rc_value+=100
+            if self.light_rc_value>1900:
+                self.light_rc_value = 1900
+        elif btn_cam_tilt_up ==0 and btn_cam_tilt_down ==1:
+            self.cam_rc_value-=100
+            if self.light_rc_value < 1100:
+                self.light_rc_value = 1100
+
+        if btn_light_up == 1 and btn_light_down ==0:
+            self.light_rc_value+=100
+            if self.light_rc_value > 1900:
+                self.light_rc_value = 1900
+        elif btn_light_up == 0 and btn_light_down == 1:
+            self.light_rc_value-=100
+            if self.light_rc_value < 1100:
+                self.light_rc_value = 1100
+
         if (btn_disarm == 1 and self.arming == True):
             self.arming = False
             self.armDisarm(self.arming)
@@ -431,26 +462,17 @@ class MyVisualServoingNode(Node):
         if (btn_manual_mode and not self.set_mode[0]):
             self.set_mode[0] = True
             self.set_mode[1] = False
-            self.set_mode[2] = False
             self.get_logger().info("Mode manual")
         if (btn_automatic_mode and not self.set_mode[1]):
             self.set_mode[0] = False
             self.set_mode[1] = True
-            self.set_mode[2] = False
+
 
             self.get_logger().info("Mode automatic")
-        if (btn_corrected_mode and not self.set_mode[2]):
-            self.init_a0 = True
-            self.init_p0 = True
-            # set sum errors to 0 here, ex: Sum_Errors_Vel = [0]*3
-            self.set_mode[0] = False
-            self.set_mode[1] = False
-            self.set_mode[2] = True
-            self.get_logger().info("Mode correction")
 
     def velCallback(self, cmd_vel):
         # Only continue if manual_mode is enabled
-        if (self.set_mode[1] or self.set_mode[2]):
+        if (self.set_mode[1]):
             return
         else:
             self.get_logger().info("Sending...")
@@ -463,20 +485,34 @@ class MyVisualServoingNode(Node):
         lateral_left_right = self.mapValueScalSat(-cmd_vel.linear.y)
         pitch_left_right = self.mapValueScalSat(cmd_vel.angular.y)
 
-        self.setOverrideRCIN(pitch_left_right, roll_left_right, ascend_descend, yaw_left_right, forward_reverse,
-                             lateral_left_right)
+        light_rc = self.light_rc_value
+        cam_rc = self.cam_rc_value
 
-    def setOverrideRCIN(self, channel_pitch, channel_roll, channel_throttle, channel_yaw, channel_forward, channel_lateral):
+        self.setOverrideRCIN(pitch_left_right, roll_left_right, ascend_descend, yaw_left_right, forward_reverse,
+                             lateral_left_right, light_rc,cam_rc)
+
+    def setOverrideRCIN(self, channel_pitch, channel_roll, channel_throttle, channel_yaw, channel_forward,
+                        channel_lateral,ligth_rc, cam_rc):
         msg_override = OverrideRCIn()
-        msg_override.channels = [1500] * 8
-        msg_override.channels[0] = np.uint(channel_roll)      # Roll
-        msg_override.channels[1] = np.uint(channel_pitch)   # Pitch
+        msg_override.channels = [1500] * 18
+        msg_override.channels[0] = np.uint(channel_roll)  # Roll
+        msg_override.channels[1] = np.uint(channel_pitch)  # Pitch
         msg_override.channels[2] = np.uint(channel_throttle)  # Throttle
-        msg_override.channels[3] = np.uint(channel_yaw)      # Yaw
-        msg_override.channels[4] = np.uint(channel_forward)   # Forward
-        msg_override.channels[5] = np.uint(channel_lateral)   # Lateral
+        msg_override.channels[3] = np.uint(channel_yaw)  # Yaw
+        msg_override.channels[4] = np.uint(channel_forward)  # Forward
+        msg_override.channels[5] = np.uint(channel_lateral)  # Lateral
         msg_override.channels[6] = 1500
         msg_override.channels[7] = 1500
+        msg_override.channels[8] = ligth_rc # light
+        msg_override.channels[9] = cam_rc  # camera
+        msg_override.channels[10] = 1500
+        msg_override.channels[11] = 1500
+        msg_override.channels[12] = 1500
+        msg_override.channels[13] = 1500
+        msg_override.channels[14] = 1500
+        msg_override.channels[15] = 1500
+        msg_override.channels[16] = 1500
+        msg_override.channels[17] = 1500
 
         # if self.pinger_distance > self.max_pinger_distance and self.pinger_confidence > 95:
         #     msg_override.channels[0] = 1500  # Roll

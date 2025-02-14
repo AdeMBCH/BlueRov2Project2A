@@ -64,79 +64,148 @@ ros2 launch autonomous_rov run_state_machine.launch
       # If using compressed images (sensor_msgs/CompressedImage)
       # image_np = self.bridge.compressed_imgmsg_to_cv2(msg)
 ```
+# ImageProcessingWithYolo Node
 
-- **visual_servoing_node.py**: This node implements the visual servoing system, computing the error between the tracked point and the desired point and adjusting the robot's position accordingly. **It controls the ROV's lateral movements, yaw, and forward motion using a proportional controller.**
-- **launch**: Directory containing launch files to execute the nodes.
+This ROS2 node performs real-time image processing and object detection using a custom YOLOv5 model. It subscribes to a camera image topic, processes incoming frames to detect objects (e.g., buoys), and publishes tracking information such as the current detected object's position, the desired point, and a segment representing the object's width.
 
-## Project Structure : visual_servoing_essai.py
+## Main Features
 
-## Node Description
-The primary node is **visual_servoing_node**, which subscribes to vision data, computes control errors, and publishes velocity commands for robot movement.
+- **YOLOv5 Object Detection**  
+  The node loads a custom YOLOv5 model via PyTorch and performs inference on incoming images. Detection results (bounding boxes, confidence scores, and class labels) are drawn on the image to provide visual feedback.
 
-### Subscriptions
-| Topic | Message Type | Description |
-|--------|-------------|-------------|
-| `/bluerov2/desired_point` | `Float64MultiArray` | Target position in image coordinates. |
-| `/bluerov2/tracked_point` | `Float64MultiArray` | Currently tracked position of the target (buoy). |
-| `tracked_segment` | `Float64MultiArray` | Information about the tracked segment (bounding box). |
+- **Real-Time Image Processing**  
+  Using CvBridge, the node converts ROS image messages into OpenCV images, applies YOLO detection, and displays the annotated frames in an OpenCV window titled "Result". It also logs the inference time to monitor performance.
 
-### Publications
-| Topic | Message Type | Description |
-|--------|-------------|-------------|
-| `computed_error` | `Twist` | Corrected velocity based on visual error. |
-| `rc/override` | `OverrideRCIn` | Direct RC commands sent to the BlueROV2. |
-| `angle_degree` | `Twist` | Angle corrections in degrees. |
-| `depth` | `Float64` | Depth control. |
-| `angular_vel` | `Twist` | Angular velocity commands. |
-| `linear_vel` | `Twist` | Linear velocity commands. |
-| `visual_servoing/error` | `Float64MultiArray` | Error vector between tracked and desired positions. |
-| `visual_servoing/cam_speed` | `Twist` | Camera movement velocity commands. |
-| `visual_servoing/robot_speed` | `Twist` | Robot movement velocity commands. |
+- **Coordinate Conversion**  
+  The node includes a helper function to convert pixel coordinates to metric units based on predefined camera calibration parameters. This conversion is applied to both the detected object's position and the desired point.
 
-## ## Project Structure : state_machine_visual_servo.py
+## Publishers
 
-The system has three main states:
-1. **SEARCHING** - The buoy is not detected, and the robot follows a search pattern.
-2. **TRACKING** - The buoy is detected, and the robot follows it using visual servoing.
-3. **LOST** - The buoy is lost, and the robot attempts to reorient toward the last known position.
+- **tracked_point** (`Float64MultiArray`)  
+  Publishes the metric coordinates of the current tracked object (e.g., the buoy) based on the center of the detection bounding box.
 
-## Key Functionalities
-### 1. **State Update (`update_state`)**
-- Determines the current state of the system and transitions accordingly.
-- Calls `search_for_buoy()` if the buoy is lost.
-- Calls `compute_visual_servo()` when tracking.
+- **desired_point** (`Float64MultiArray`)  
+  Publishes the desired tracking point in metric coordinates. This point is either the image center by default or set via a right-click by the user.
 
-### 2. **Buoy Searching (`search_for_buoy`)**
-- Implements different search patterns (**spiral** or **eight**) to locate the target. This part isn't finished yet, improvements are on its way.
+- **tracked_segment** (`Float64MultiArray`)  
+  Publishes a segment defined by the left and right midpoints of the detected bounding box (converted to metric units), representing the object's width.
 
-### 3. **Reorientation (`reorient_to_last_known_position`)**
-- Moves the robot towards the last known buoy position before resuming searching.
+## Processing Workflow
 
-### 4. **Error Computation (`compute_error`)**
-- Computes **proportional**, **integral**, and **derivative** errors using a PID controller.
-- Publishes the error vector.
+1. **Image Reception**  
+   The node subscribes to the `/bluerov2/camera/image` topic to receive raw image frames.
 
-### 5. **Visual Servoing Computation (`compute_visual_servo`)**
-- Uses an **interaction matrix** to compute the necessary camera movement to correct the error.
-- Transforms camera velocity into robot velocity.
-- Sends control commands to actuators.
+2. **Image Conversion**  
+   ROS image messages are converted to OpenCV BGR images using CvBridge.
 
-### 6. **Forward Movement Decision (`forward_move`)**
-- Determines whether the robot should move forward based on the target's size in the image.
+3. **Desired Point Selection**  
+   The desired point is initially set to the image center but can be updated via a right-click, which triggers the mouse callback.
 
-## PID Control Parameters
-| Parameter | Description | Default Value   |
-|------------|--------------------|-----------------|
-| `P` | Proportional gain | 0 0 0 0 0 2.5   |
-| `I` | Integral gain | 0 0 0 0 0 0.0001 |
-| `D` | Derivative gain | 0 0 0 0 0 0.001 |
-| `Z` | Depth gain | 1.0             |
-| `motor_max_val` | Max motor signal | 1900            |
-| `motor_min_val` | Min motor signal | 1100            |
-| `Correction_yaw` | Base yaw correction | 1500            |
-| `Correction_depth` | Base depth correction | 1500            |
-| `THRESHOLD_WIDTH` | Min size before advancing | 0.12            |
+4. **Object Detection**  
+   The image is converted from BGR to RGB and passed to the YOLOv5 model for inference. Detected objects are annotated with bounding boxes and labels.
 
+5. **Segment and Point Calculation**  
+   - The left and right midpoints of the first detected bounding box are calculated and drawn as a line.  
+   - These points are converted from pixel coordinates to meters and published as the tracked segment.  
+   - The center of the bounding box is determined and published as the current tracked point.
+
+6. **Data Publishing and Display**  
+   The node publishes the tracked segment, tracked point, and desired point (all in metric units) to their respective topics. The annotated image is then displayed in the "Result" window.
+
+7. **Performance Logging**  
+   The inference time is calculated and logged to help evaluate the node's real-time performance.
+
+## Dependencies
+
+- **ROS2**  
+- **OpenCV**  
+- **CvBridge**  
+- **PyTorch** (for YOLOv5 inference)  
+- **YOLOv5** (custom model loaded from a local repository)
+
+This node is designed for robust real-time object detection and tracking in applications such as buoy tracking for underwater robotics.
+
+
+# MyVisualServoingNode
+
+This ROS2 node implements a visual servoing logic for a BlueROV, integrating various data sources (IMU, depth sensors, joystick, vision) and directly commanding the actuators using messages of type `OverrideRCIn`. It allows controlling the robot's movement, the camera tilt, and the light intensity based on visual tracking (e.g., for buoy detection and tracking).
+
+## Main Features
+
+- **Visual Servoing Calculation**  
+  The node computes the error between a desired point and the tracked point (extracted from visual processing) and, using an interaction matrix and its pseudo-inverse, derives the velocity commands for the camera. These velocities are then transformed into commands for the robot via a homogeneous transformation.  
+  PID gains (P, I, D) are used to adjust the control behavior.
+
+- **Joystick Control**  
+  The node integrates input from a game controller (via the `/joy` topic) to:  
+  - Arm/disarm the motors (Start and Back buttons).  
+  - Switch between manual and automatic modes (A and X buttons).  
+  - Adjust the camera tilt (buttons used to increase/decrease the `cam_rc_value`).  
+  - Control the lighting (buttons associated with increasing/decreasing `light_rc_value`).
+
+- **State Management and State Machine**  
+  An internal state machine manages the robot's behavioral strategy during visual tracking:  
+  - **SEARCHING**: The robot searches for the buoy using a predefined movement strategy (spiral or figure eight).  
+  - **TRACKING**: Once the buoy is detected, tracking mode is activated to follow the point of interest, with continuous recalculation of the visual correction.  
+  - **LOST**: If the tracked point is no longer detected (after a certain delay), the robot switches to LOST mode and reorients towards the last known position before potentially returning to SEARCHING mode.  
+  Transitions between these states are managed in the `update_state()` method, which controls the switch based on sensor data and visual tracking.
+
+- **Integration of Sensors and Services**  
+  The node subscribes to various topics to retrieve:  
+  - Velocity commands (`cmd_vel`),  
+  - IMU data (`imu/data`) to compute angles (roll, pitch, yaw),  
+  - Relative depth (`global_position/rel_alt`),  
+  - Data for desired and tracked points (`/bluerov2/desired_point` and `/bluerov2/tracked_point`),  
+  - Sonar data (ping1d).  
+  Service calls (for example, to arm/disarm via `cmd/command`, to switch modes via `set_mode`, or to set the stream rate via `set_stream_rate`) are also implemented.
+
+## Architecture and Components
+
+### Publishers
+
+- **computed_error** (`Twist`): Publishes the calculated error for visual servoing.
+- **rc/override** (`OverrideRCIn`): Sends PWM commands to the robot's actuators.
+- **angle_degree** (`Twist`): Publishes angles (roll, pitch, yaw) expressed in degrees.
+- **depth** (`Float64`): Publishes the relative depth with respect to the startup point.
+- **angular_vel** and **linear_vel** (`Twist`): Publish angular and linear velocities.
+- **visual_servoing/error** (`Float64MultiArray`): Sends the error vector used in the control.
+- **visual_servoing/cam_speed** (`Twist`): Publishes the calculated camera speed.
+- **visual_servoing/robot_speed** (`Twist`): Publishes the robot speed obtained after transformation.
+
+### Subscribers
+
+- **joy** (`Joy`): Receives joystick commands to arm/disarm, switch modes, and adjust camera/light.
+- **cmd_vel** (`Twist`): Receives velocity commands in manual mode.
+- **imu/data** (`Imu`): Processes orientation and angular velocity data.
+- **global_position/rel_alt** (`Float64`): Receives relative depth data.
+- **/bluerov2/desired_point** and **/bluerov2/tracked_point** (`Float64MultiArray`): Track the point of interest (e.g., a buoy) and calculate the visual servoing error.
+- **tracked_segment** (`Float64MultiArray`): Used to determine if the buoy is sufficiently large (close) to halt forward movement.
+- **ping1d/data** (`Float64MultiArray`): Receives sonar (pinger) data.
+
+### Main Methods
+
+- **compute_visual_servo**  
+  Computes the error between the desired point and the tracked point, uses the interaction matrix and its pseudo-inverse to determine the camera's velocity commands, and then transforms these velocities into commands for the robot. These commands are sent via the `rc/override` topic.
+
+- **joyCallback**  
+  Manages joystick inputs to:  
+  - Adjust the PWM values for the camera and lighting.  
+  - Arm/disarm the robot.  
+  - Switch between modes (manual or automatic).
+
+- **velCallback**  
+  Receives `cmd_vel` commands in manual mode and converts them into PWM commands for the robot.
+
+- **OdoCallback**  
+  Processes IMU data to calculate orientation angles and angular velocity, then publishes this information on the `angle_degree` and `angular_vel` topics.
+
+- **Services and Utilities**  
+  - `armDisarm`: Arms/disarms the robot via a MAVLink long command.  
+  - `manageStabilize`: Switches between stabilized and manual modes.  
+  - `setStreamRate`: Sets the MAVLink message stream rate.  
+  - `mapValueScalSat`: Transforms a value between -1 and 1 into a PWM value (between 1100 and 1900).
+
+---
 
 # Troubleshooting
 

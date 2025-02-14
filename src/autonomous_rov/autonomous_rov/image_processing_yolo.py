@@ -7,7 +7,6 @@ from sensor_msgs.msg import Image, CompressedImage   # need to import Compressed
 from mavros_msgs.msg import CameraImageCaptured
 import numpy as np
 import cv2
-from . import camera_parameters as cam
 from cv_bridge import CvBridge
 import torch
 import time
@@ -78,18 +77,17 @@ class ImageProcessingWithYolo(Node):
         self.get_logger().info("Modèle chargé avec succès.")
 
         self.bridge = CvBridge()  # CvBridge for converting ROS images to OpenCV format
-        # self.image_sub = self.create_subscription(
-        #     Image,
-        #     '/bluerov2/camera/image',
-        #     self.image_callback,
-        #     10
-        # )
-
-        self.subscription = self.create_subscription(
-            CompressedImage,
-            '/br4/raspicam_node/image/compressed',
+        self.image_sub = self.create_subscription(
+            Image,
+            '/bluerov2/camera/image',
             self.image_callback,
             10)
+
+        # self.subscription = self.create_subscription(
+        #     CompressedImage,
+        #     '/br4/raspicam_node/image/compressed',
+        #     self.image_callback,
+        #     10)
 
         cv2.namedWindow("Result")
         cv2.setMouseCallback("Result", click_detect)
@@ -98,8 +96,8 @@ class ImageProcessingWithYolo(Node):
         self.get_logger().info('Received new frame !')
         start_time = time.time()
 
-        # image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        image = self.bridge.compressed_imgmsg_to_cv2(msg)
+        image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        # image = self.bridge.compressed_imgmsg_to_cv2(msg)
 
         global set_desired_point
 
