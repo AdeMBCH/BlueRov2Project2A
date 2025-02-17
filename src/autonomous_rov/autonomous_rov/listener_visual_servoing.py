@@ -97,13 +97,15 @@ class MyVisualServoingNode(Node):
 
         self.desired_point = None
         self.tracked_point = None
+        self.current_width = None
+        self.previous_time = None
         self.has_tracked_point = False
         self.buoy_detected = False
 
         self.tolerance_error = 0.10
         self.Z = 1.0
 
-        self.P = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 2.0  ])
+        self.P = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 2.0  ])
         self.I = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0001])
         self.D = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.001])
 
@@ -113,21 +115,21 @@ class MyVisualServoingNode(Node):
         self.Correction_depth = 1500
         self.homogeneous_transform = np.eye(4)
         self.thruttle = 1500
-        self.THRESHOLD_WIDTH = 0.12
+        self.GOOD_WIDTH = 0.35
 
-        self.error_integral = np.zeros(2)
-        self.previous_error = np.zeros(2)
-        self.error_derivative = np.zeros(2)
+        self.previous_error = [0.0, 0.0, 0.0]
+        self.error_integral = [0.0, 0.0, 0.0]
+        self.error_derivative = [0.0, 0.0, 0.0]
 
         self.state = "SEARCHING"
         self.last_known_position = None
-        self.search_mode = "spiral"
+        self.search_mode = "eight"
         self.start_time = time.time()
         self.timeout_duration = 1.0
 
         self.pinger_confidence = 100
-        self.pinger_distance = 10
-        self.max_pinger_distance = 1.0
+
+        self.max_pinger_distance = 0.3
 
         ### values for cam and light control
 
@@ -135,7 +137,7 @@ class MyVisualServoingNode(Node):
         self.light_rc_value = 1100 # from 1100 to 1900, light off is 1100
 
         ##### timer for auto mode #####
-        timer_period = 0.10  # 50 msec - 20 Hz
+        timer_period = 0.10  # 50 msec - 20 Hz, above IMU frequency
         self.auto_timer = self.create_timer(timer_period, self.auto_mode_callback)
 
     def auto_mode_callback(self):
@@ -143,25 +145,14 @@ class MyVisualServoingNode(Node):
             self.update_state()
 
     def segment_callback(self, msg):
-        if self.set_mode[1]:
-            x1, y1, x2, y2 = msg.data
-            current_width = x2 - x1
+        x1, y1, x2, y2 = msg.data
 
-            if current_width < self.THRESHOLD_WIDTH:
-                self.move = True
-            else:
-                self.move = False
-            self.forward_move()
-        else:
-            return
+        self.dx = x1 - x2
+        self.dy = y1 - y2
+        self.current_width = np.sqrt(self.dx ** 2 + self.dy ** 2)
+        #
+        # self.get_logger().info(f'curent width is {self.current_width}')
 
-    def forward_move(self):
-        if self.move == True:
-            self.thruttle = 1600
-            self.get_logger().info("La bouée est trop petite → Le robot doit avancer.")
-        else:
-            self.thruttle = 1500
-            self.get_logger().info("La bouée est proche → Le robot reste en place.")
 
     def desired_point_callback(self, msg):
         if len(msg.data) >= 2:
@@ -186,6 +177,33 @@ class MyVisualServoingNode(Node):
         else:
             self.get_logger().warn("Received invalid tracked point data!")
 
+    def compute_error(self):
+        if self.desired_point is None or self.tracked_point is None or self.current_width is None:
+            return np.zeros(3), np.zeros(3), np.zeros(3)
+        else:
+
+            error = self.desired_point - self.tracked_point
+            error[1] = 0.0
+            # self.get_logger().info(f'Current x error is {error[0]}')
+            depth_error = self.GOOD_WIDTH-self.current_width
+            # self.get_logger().info(f'Current depth error is {depth_error}')
+            error = np.append(error, depth_error)
+
+
+            error_array_msg = Float64MultiArray()
+            error_array_msg.data = error.tolist()
+            self.error_publisher.publish(error_array_msg)
+            current_time = time.time()
+
+            dt = current_time - self.previous_time if self.previous_time is not None else 0.04
+            self.error_integral += error * dt
+            error_derivative = (error - self.previous_error) / dt if dt > 0 else np.zeros(3)
+
+            self.previous_error = error
+            self.previous_time = current_time
+
+            return error, self.error_integral, error_derivative
+
     def compute_visual_servo(self):
 
         error, error_integral, error_derivative = self.compute_error()
@@ -201,9 +219,9 @@ class MyVisualServoingNode(Node):
                         +self.D * L_pinv.dot(error_derivative))
 
             # self.get_logger().error(f"Error is {error}")
-        except:
+        except np.linalg.LinAlgError:
             self.get_logger().error("Singular interaction matrix, cannot compute pseudo-inverse")
-            self.error_integral = np.zeros(2)
+            self.error_integral = np.zeros(3)
             return
 
         # Publish camera velocity
@@ -235,6 +253,9 @@ class MyVisualServoingNode(Node):
 
         # Map robot velocity to control commands
         cmd_vel = Twist()
+
+        cmd_vel.linear.x = robot_speed[0]
+        cmd_vel.linear.y = robot_speed[1]
         cmd_vel.linear.z = robot_speed[2]
         cmd_vel.angular.x = robot_speed[3]
         cmd_vel.angular.y = robot_speed[4]
@@ -250,37 +271,15 @@ class MyVisualServoingNode(Node):
 
         # self.get_logger().info(f"Yaw speed: {cmd_vel.angular.z}")
         # self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
-
+        forward_reverse = max(min(forward_reverse,1560), 1430)  # not bad actually
         # Send commands to robot
-        light_rc = self.light_rc_value
-        cam_rc = self.cam_rc_value
         self.setOverrideRCIN(1500, 1500, 1500,
-                              yaw_left_right, 1500, 1500, light_rc, cam_rc)
+                              yaw_left_right, forward_reverse, 1500, self.light_rc_value, self.cam_rc_value)
 
         self.get_logger().info(f' Published new command to RCIN :'
                                f' yaw : {yaw_left_right}, '   #need to check
-                               f' thruttle : {1500}, '     #okay
+                               f' thruttle : {forward_reverse}, '     #okay
                                f' lateral lr : {1500}')    #okay
-
-    def compute_error(self):
-        if self.desired_point is None or self.tracked_point is None:
-            return np.zeros(2), np.zeros(2), np.zeros(2)
-        else:
-
-            error = self.desired_point - self.tracked_point
-            error[1] =0.0
-            error_array_msg = Float64MultiArray()
-            error_array_msg.data = error.tolist()
-            self.error_publisher.publish(error_array_msg)
-
-
-            self.error_integral += error
-
-            error_derivative = error - self.previous_error
-
-            self.previous_error = error
-
-            return error, self.error_integral, error_derivative
 
     def transform_velocity(self, cam_speed, H):
         # Transform camera velocity to robot velocity using homogeneous transform H
@@ -293,17 +292,19 @@ class MyVisualServoingNode(Node):
         return vrobot
 
     def compute_interaction_matrix(self, points, Z):
-        # Compute the interaction matrix for the given points
         num_points = len(points) // 2
         L = []
+
         for i in range(num_points):
             x = points[2 * i]
             y = points[2 * i + 1]
             L_point = np.array([
-                [-1 / Z,      0, x / Z,  x * y, -(1 + x ** 2),      y],
-                [     0, -1 / Z, y / Z, 1 + y ** 2,     -x * y,     -x]
+                [-1 / Z, 0, x / Z, x * y, -(1 + x ** 2), y],
+                [0, -1 / Z, y / Z, 1 + y ** 2, -x * y, -x],
+                [1/Z, 0, 0, 0, 0, 0]
             ])
             L.append(L_point)
+
         L = np.vstack(L)
         return L
 
@@ -514,13 +515,11 @@ class MyVisualServoingNode(Node):
         msg_override.channels[16] = 1500
         msg_override.channels[17] = 1500
 
-        # if self.pinger_distance > self.max_pinger_distance and self.pinger_confidence > 95:
-        #     msg_override.channels[0] = 1500  # Roll
-        #     msg_override.channels[1] = 1500  # Pitch
-        #     msg_override.channels[2] = 1500  # Throttle
-        #     msg_override.channels[3] = 1600  # Yaw
-        #     msg_override.channels[4] = 1500  # Forward
-        #     msg_override.channels[5] = 1500  # Lateral
+        # if self.pinger_distance < self.max_pinger_distance and self.pinger_confidence>90:
+        #     msg_override.channels[4] = 1450  # Throttle
+        #     msg_override.channels[3] = 1450  # Yaw
+        #
+        #     # self.get_logger().error("Distance too short")
 
         self.overrideRCIN_publisher.publish(msg_override)
 
@@ -669,7 +668,7 @@ class MyVisualServoingNode(Node):
         self.pinger_distance = data.data[0]
         self.pinger_confidence = data.data[1]
 
-    # self.get_logger().info("pinger_distance =" + str(self.pinger_distance))
+        self.get_logger().info(f"pinger_distance = {self.pinger_distance}")
 
     def update_state(self):
         if self.state == "SEARCHING":
@@ -697,11 +696,11 @@ class MyVisualServoingNode(Node):
         elapsed_time = time.time() - self.start_time
 
         if self.search_mode == "spiral":
-            cmd_vel.linear.x = min(0.2 + elapsed_time * 0.01, 0.5)  # Avancer de plus en plus vite
-            cmd_vel.angular.z = 0.5 / (1 + elapsed_time * 0.1)  # Diminuer la rotation avec le temps
+            cmd_vel.linear.x = min(0.2 + elapsed_time * 0.01, 0.5)
+            cmd_vel.angular.z = 0.5 / (1 + elapsed_time * 0.1)
 
         elif self.search_mode == "eight":
-            cmd_vel.linear.x = 0.2  # Avancer
+            cmd_vel.linear.x = 0.2
             cmd_vel.angular.z = 0.5 * (-1) ** int(elapsed_time % 2)
 
         self.get_logger().info(f"Searching buoy around {self.last_known_position}")

@@ -8,7 +8,7 @@ from mavros_msgs.msg import CameraImageCaptured
 import numpy as np
 import cv2
 from cv_bridge import CvBridge
-
+import time
 
 def on_trackbar_change(x):
     pass
@@ -111,6 +111,7 @@ class ImageProcessingNode(Node):
 
     def cameracallback(self, msg):
         self.get_logger().info('callback has started')
+        begin_time = time.time()
 
         global get_hsv, set_desired_point, desired_point, mouseX, mouseY, hsv_value
 
@@ -206,7 +207,9 @@ class ImageProcessingNode(Node):
 
         cv2.imshow("image", image_np)
         cv2.waitKey(2)
-
+        end_time = time.time()
+        elapsed_time = end_time-begin_time
+        self.get_logger().warn(f"Computation with HSV took {elapsed_time*1000:.2f} milliseconds")
 
 def main(args=None):
     rclpy.init(args=args)

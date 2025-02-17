@@ -73,7 +73,7 @@ class ImageProcessingWithYolo(Node):
                                     'custom',
                                     path='/home/projet_sysmer/ros2_ws/src/yolov5/runs/train/exp3/weights/best.pt',
                                     source='local')
-        self.model.conf = 0.70  # Seuil de confiance
+        self.model.conf = 0.40  # Seuil de confiance
         self.get_logger().info("Modèle chargé avec succès.")
 
         self.bridge = CvBridge()  # CvBridge for converting ROS images to OpenCV format
@@ -168,7 +168,7 @@ class ImageProcessingWithYolo(Node):
 
         end_time = time.time()
         inference_time = (end_time - start_time) * 1000  # en ms
-        self.get_logger().info(f"Temps d'inférence : {inference_time:.2f} ms")
+        self.get_logger().info(f"Inference time with YOLOv5Nano : {inference_time:.2f} milliseconds")
 
 
 

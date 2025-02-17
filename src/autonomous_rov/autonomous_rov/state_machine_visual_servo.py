@@ -52,13 +52,15 @@ class VisualServoing(Node):
 
         self.desired_point = None
         self.tracked_point = None
+        self.current_width = None
+        self.previous_time = None
         self.has_tracked_point = False
         self.buoy_detected = False
 
         self.tolerance_error = 0.10
         self.Z = 1.0
 
-        self.P = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 2.0  ])
+        self.P = np.array([3.0, 0.0, 0.0, 0.0, 0.0, 2.0  ])
         self.I = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0001])
         self.D = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.001])
 
@@ -68,11 +70,11 @@ class VisualServoing(Node):
         self.Correction_depth = 1500
         self.homogeneous_transform = np.eye(4)
         self.thruttle = 1500
-        self.THRESHOLD_WIDTH = 0.12
+        self.GOOD_WIDTH = 0.20
 
-        self.previous_error = [0.0, 0.0]
-        self.error_integral = [0.0, 0.0]
-        self.error_derivative = [0.0, 0.0]
+        self.previous_error = [0.0, 0.0, 0.0]
+        self.error_integral = [0.0, 0.0, 0.0]
+        self.error_derivative = [0.0, 0.0, 0.0]
 
         self.state = "SEARCHING"
         self.last_known_position = None
@@ -91,7 +93,7 @@ class VisualServoing(Node):
 
     def update_state(self):
         if self.state == "SEARCHING":
-            if self.tracked_point is not None:
+            if self.tracked_point is not None and self.current_width is not None:
                 self.buoy_detected = True
                 self.state = 'TRACKING'
                 self.get_logger().info(f"La bouée vient d'être retrouvée...")
@@ -145,21 +147,13 @@ class VisualServoing(Node):
 
     def segment_callback(self, msg):
         x1, y1, x2, y2 = msg.data
-        current_width = x2 - x1
 
-        if current_width < self.THRESHOLD_WIDTH:
-            move = True
-        else:
-            move = False
-        self.forward_move(move)
+        self.dx = x1 - x2
+        self.dy = y1 - y2
+        self.current_width = np.sqrt(self.dx ** 2 + self.dy ** 2)
 
-    def forward_move(self, move):
-        if move == True:
-            self.thruttle = 1600
-            self.get_logger().info("La bouée est trop petite → Le robot doit avancer.")
-        else:
-            self.thruttle = 1500
-            self.get_logger().info("La bouée est proche → Le robot reste en place.")
+        self.get_logger().info(f'curent width is {self.current_width}, error is {self.GOOD_WIDTH-self.current_width}')
+
 
     def desired_point_callback(self, msg):
         if len(msg.data) >= 2:
@@ -191,22 +185,29 @@ class VisualServoing(Node):
                 self.reorient_to_last_known_position()
 
     def compute_error(self):
-        if self.desired_point is None or self.tracked_point is None:
-            return np.zeros(2), np.zeros(2), np.zeros(2)
+        if self.desired_point is None or self.tracked_point is None or self.current_width is None:
+            return np.zeros(3), np.zeros(3), np.zeros(3)
         else:
 
             error = self.desired_point - self.tracked_point
-            error[1] =0.0
+            error[1] = 0.0
+            # self.get_logger().info(f'Current x error is {error[0]}')
+            depth_error = self.GOOD_WIDTH-self.current_width
+            # self.get_logger().info(f'Current depth error is {depth_error}')
+            error = np.append(error, depth_error)
+
+
             error_array_msg = Float64MultiArray()
             error_array_msg.data = error.tolist()
             self.error_publisher.publish(error_array_msg)
+            current_time = time.time()
 
-
-            self.error_integral += error
-
-            error_derivative = error - self.previous_error
+            dt = current_time - self.previous_time if self.previous_time is not None else 0.04
+            self.error_integral += error * dt
+            error_derivative = (error - self.previous_error) / dt if dt > 0 else np.zeros(3)
 
             self.previous_error = error
+            self.previous_time = current_time
 
             return error, self.error_integral, error_derivative
 
@@ -225,9 +226,9 @@ class VisualServoing(Node):
                         +self.D * L_pinv.dot(error_derivative))
 
             # self.get_logger().error(f"Error is {error}")
-        except:
+        except np.linalg.LinAlgError:
             self.get_logger().error("Singular interaction matrix, cannot compute pseudo-inverse")
-            self.error_integral = np.zeros(2)
+            self.error_integral = np.zeros(3)
             return
 
         # Publish camera velocity
@@ -259,6 +260,9 @@ class VisualServoing(Node):
 
         # Map robot velocity to control commands
         cmd_vel = Twist()
+
+        cmd_vel.linear.x = robot_speed[0]
+        cmd_vel.linear.y = robot_speed[1]
         cmd_vel.linear.z = robot_speed[2]
         cmd_vel.angular.x = robot_speed[3]
         cmd_vel.angular.y = robot_speed[4]
@@ -277,11 +281,11 @@ class VisualServoing(Node):
 
         # Send commands to robot
         self.setOverrideRCIN(1500, 1500, 1500,
-                              yaw_left_right, 1500, 1500)
+                              yaw_left_right, forward_reverse, 1500)
 
         self.get_logger().info(f' Published new command to RCIN :'
                                f' yaw : {yaw_left_right}, '   #need to check
-                               f' thruttle : {1500}, '     #okay
+                               f' thruttle : {forward_reverse}, '     #okay
                                f' lateral lr : {1500}')    #okay
 
     def transform_velocity(self, cam_speed, H):
@@ -295,17 +299,19 @@ class VisualServoing(Node):
         return vrobot
 
     def compute_interaction_matrix(self, points, Z):
-        # Compute the interaction matrix for the given points
         num_points = len(points) // 2
         L = []
+
         for i in range(num_points):
             x = points[2 * i]
             y = points[2 * i + 1]
             L_point = np.array([
-                [-1 / Z,      0, x / Z,  x * y, -(1 + x ** 2),      y],
-                [     0, -1 / Z, y / Z, 1 + y ** 2,     -x * y,     -x]
+                [-1 / Z, 0, x / Z, x * y, -(1 + x ** 2), y],
+                [0, -1 / Z, y / Z, 1 + y ** 2, -x * y, -x],
+                [1/Z, 0, 0, 0, 0, 0]
             ])
             L.append(L_point)
+
         L = np.vstack(L)
         return L
 
