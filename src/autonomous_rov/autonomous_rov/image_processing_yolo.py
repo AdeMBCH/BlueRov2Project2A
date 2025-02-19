@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import csv
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray
@@ -71,9 +71,9 @@ class ImageProcessingWithYolo(Node):
         self.get_logger().info("Chargement du modèle YOLOv5...")
         self.model = torch.hub.load('/home/projet_sysmer/ros2_ws/src/yolov5',
                                     'custom',
-                                    path='/home/projet_sysmer/ros2_ws/src/yolov5/runs/train/exp10/weights/best.pt',
+                                    path='/home/projet_sysmer/ros2_ws/src/yolov5/runs/train/exp3/weights/best.pt',
                                     source='local')
-        self.model.conf = 0.10  # Seuil de confiance
+        self.model.conf = 0.20  # Seuil de confiance
         self.get_logger().info("Modèle chargé avec succès.")
 
         self.bridge = CvBridge()  # CvBridge for converting ROS images to OpenCV format
@@ -99,7 +99,7 @@ class ImageProcessingWithYolo(Node):
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         # image = self.bridge.compressed_imgmsg_to_cv2(msg)
 
-        global set_desired_point
+        global set_desired_point, current_width, current_point_meter
 
         if image is None:
             self.get_logger().error(f"Erreur : Impossible de charger l'image à partir de {self.image}")
@@ -145,7 +145,14 @@ class ImageProcessingWithYolo(Node):
             right_point_meter = convertOnePoint2meter(right_point)
 
             #publication du message
-            segment_msg = Float64MultiArray(data=[*left_point_meter, *right_point_meter])
+            x1, y1 = left_point_meter
+            x2, y2 = right_point_meter
+            dx = x1 - x2
+            dy = y1 - y2
+            current_width = np.sqrt(dx ** 2 + dy ** 2)
+            current_width = current_width*0.95
+            segment_msg = Float64MultiArray(data=[current_width])
+
             self.pub_tracked_segment.publish(segment_msg)
 
             cx,cy = int((x1+x2)//2), int((y1 + y2)//2)
@@ -156,11 +163,17 @@ class ImageProcessingWithYolo(Node):
             current_point_msg = Float64MultiArray(data=current_point_meter)
             self.pub_tracked_point.publish(current_point_msg)
 
+
         if desired_point is not None:
             overlay_points(image, desired_point, 255, 0, 0, 'desired point')
             desired_point_meter = convertOnePoint2meter(desired_point)
             desired_point_msg = Float64MultiArray(data=desired_point_meter)
             self.pub_desired_point.publish(desired_point_msg)
+
+
+
+
+
 
         # Afficher l'image annotée dans une fenêtre OpenCV
         cv2.imshow("Result", image)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import csv
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray
@@ -10,18 +11,7 @@ import cv2
 from cv_bridge import CvBridge
 import time
 
-def on_trackbar_change(x):
-    pass
 
-
-cv2.namedWindow('Result')
-
-cv2.createTrackbar('Hue_Lower', 'Result', 0, 179, on_trackbar_change)
-cv2.createTrackbar('Hue_Upper', 'Result', 30, 179, on_trackbar_change)
-cv2.createTrackbar('Saturation_Lower', 'Result', 100, 255, on_trackbar_change)
-cv2.createTrackbar('Saturation_Upper', 'Result', 255, 255, on_trackbar_change)
-cv2.createTrackbar('Value_Lower', 'Result', 100, 255, on_trackbar_change)
-cv2.createTrackbar('Value_Upper', 'Result', 255, 255, on_trackbar_change)
 
 # Hue: 170 (ranges from 0 to 179 in OpenCV)
 # Saturation: 155 (ranges from 0 to 255)
@@ -41,6 +31,7 @@ lx = 455
 ly = 455
 kud = 0.00683
 kdu = -0.01424
+
 
 
 # convert a pixel coordinate to meters using defaut calibration parameters
@@ -85,22 +76,19 @@ def click_detect(event, x, y, flags, param):
 class ImageProcessingNode(Node):
     def __init__(self):
         super().__init__('image_processing_node')
-
         self.pub_tracked_point = self.create_publisher(Float64MultiArray, 'tracked_point', 10)
         self.pub_desired_point = self.create_publisher(Float64MultiArray, 'desired_point', 10)
         self.pub_tracked_segment = self.create_publisher(Float64MultiArray, 'tracked_segment', 10)
-        #
-        # self.subscription = self.create_subscription(
-        #     CompressedImage,
-        #     '/br4/raspicam_node/image/compressed',
-        #     self.cameracallback,
-        #     10)
 
         self.subscription = self.create_subscription(
             Image,
             '/bluerov2/camera/image',
             self.cameracallback,
             10)
+
+        self.last_tracked_point = None  # en mètres
+        self.last_time = None
+        self.max_speed = 1.5  # seuil de vitesse en m/s (à ajuster)
 
         self.bridge = CvBridge()  # CvBridge for converting ROS images to OpenCV format
 
@@ -111,18 +99,13 @@ class ImageProcessingNode(Node):
 
     def cameracallback(self, msg):
         begin_time = time.time()
-        self.get_logger().info('callback has started')
-        begin_time = time.time()
 
-        global get_hsv, set_desired_point, desired_point, mouseX, mouseY, hsv_value
+        global get_hsv, set_desired_point, mouseX, mouseY, hsv_value
 
         try:
-            # Si vous utilisez des images non compressées (sensor_msgs/Image)
             image_np = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-
-            # # Si vous utilisez des images compressées (sensor_msgs/CompressedImage)
+            # Pour les images compressées, utilisez :
             # image_np = self.bridge.compressed_imgmsg_to_cv2(msg)
-
         except Exception as e:
             self.get_logger().error(f"Erreur lors de la conversion de l'image: {e}")
             return
@@ -133,87 +116,101 @@ class ImageProcessingNode(Node):
 
         image_height, image_width, image_channels = image_np.shape
 
-        desired_point = [image_width / 2, image_height / 2]  # we are in a loop, next if-statement won't matter
-
+        desired_point = [image_width / 2, image_height / 2]
         if set_desired_point:
             desired_point = [mouseX, mouseY]
             set_desired_point = False
 
         hsv = cv2.cvtColor(image_np, cv2.COLOR_BGR2HSV)
-
         if get_hsv:
-            hsv_value = hsv[mouseY, mouseX]  # Corrected order for indexing
-            self.get_logger().info(f"HSV Value at ({mouseX}, {mouseY}): {hsv_value}")
+            hsv_value = hsv[mouseY, mouseX]
+            self.get_logger().info(f"HSV Value at ({mouseX},{mouseY}):{hsv_value}")
             get_hsv = False
 
-        # lower_bound = np.array([170, 155, 160])
-        # upper_bound = np.array([179, 250, 255])
-
         tolerance = np.array([10, 50, 50])
-
-        lower_bound = np.clip(hsv_value - tolerance, 0, 255)
-        upper_bound = np.clip(hsv_value + tolerance, 0, 255)
-
-        # Hue: 170 (ranges from 0 to 179 in OpenCV)
-        # Saturation: 155 (ranges from 0 to 255)
-        # Value: 160 (ranges from 0 to 255)
+        lower_bound = np.clip(np.array(hsv_value) - tolerance, 0, 255)
+        upper_bound = np.clip(np.array(hsv_value) + tolerance, 0, 255)
 
         mask = cv2.inRange(hsv, lower_bound, upper_bound)
-        cv2.imshow('Mask using HSV values', mask)
-        non_zero_pixels = cv2.findNonZero(mask)  # we receive pixels that are positive so in the mask
-        # self.get_logger().info(f"shape of non-zero-pixels is {non_zero_pixels}")
-
+        non_zero_pixels = cv2.findNonZero(mask)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        if contours:
-            # Trouver le contour le plus grand
+        tracked_point = None
+        segment_width = None
+        segment_y = None
+        left_point = None
+        right_point = None
+
+        # Calcul du point suivi
+        if non_zero_pixels is not None and len(non_zero_pixels) > 0:
+            mean_point = np.mean(non_zero_pixels, axis=0, dtype=int)
+            tracked_point = list(mean_point[0])
+
+        # Calcul du segment uniquement si un point suivi est détecté et des contours sont présents
+        if tracked_point is not None and contours:
+            cx, cy = tracked_point
             largest_contour = max(contours, key=cv2.contourArea)
-            x, y, w, h = cv2.boundingRect(largest_contour)  # Boîte englobante
+            x, y, w, h = cv2.boundingRect(largest_contour)
+            left_point = (x, cy)
+            right_point = (x + w, cy)
 
-            # Points extrêmes gauche et droite
-            left_point = (x, y + h // 2)
-            right_point = (x + w, y + h // 2)
-
-            # Afficher le segment
-            cv2.line(image_np, left_point, right_point, (0, 0, 0), 5)
-
-            # Convertir en mètres
+            # Conversion en mètres
             left_point_meter = convertOnePoint2meter(left_point)
             right_point_meter = convertOnePoint2meter(right_point)
+            dx = left_point_meter[0] - right_point_meter[0]
+            dy = left_point_meter[1] - right_point_meter[1]
+            current_width = np.sqrt(dx ** 2 + dy ** 2)
+            # Validation du segment sur la largeur
 
-            # Publier sur un topic
-            segment_msg = Float64MultiArray(data=[*left_point_meter, *right_point_meter])
-            self.pub_tracked_segment.publish(segment_msg)
+            if current_width >= 0.07:
+                segment_width = current_width
 
+        current_time = time.time()
+        valid_update = True
+        if tracked_point is not None:
+            current_point_meter = convertOnePoint2meter(tracked_point)
+            if self.last_tracked_point is not None and self.last_time is not None:
+                dt = current_time - self.last_time
+                if dt > 0:
+                    displacement = np.linalg.norm(np.array(current_point_meter) - np.array(self.last_tracked_point))
+                    speed = displacement / dt
+                    if speed > self.max_speed:
+                        self.get_logger().info(f"Vitesse trop élevée: {speed:.2f} m/s, mise à jour ignorée")
+                        valid_update = False
+                        current_point_meter = self.last_tracked_point
+                    else:
+                        self.last_tracked_point = current_point_meter
+                        self.last_time = current_time
+                else:
+                    self.last_tracked_point = current_point_meter
+                    self.last_time = current_time
+            else:
+                self.last_tracked_point = current_point_meter
+                self.last_time = current_time
 
-
-        current_point = [0, 0]
-
-        if non_zero_pixels is not None and len(non_zero_pixels) > 0:  # if the mask "exists"
-            mean_point = np.mean(non_zero_pixels, axis=0, dtype=int)
-            cx, cy = mean_point[0]
-            cv2.circle(image_np, (cx, cy), 5, (0, 255, 0), -1)
-            current_point = [cx, cy]
-            overlay_points(image_np, current_point, 0, 255, 0, 'current tracked buoy')
-
-        if current_point != [0, 0]:
-            current_point_meter = convertOnePoint2meter(current_point)
+        # Publier et afficher uniquement si le point et le segment sont valides ET la vitesse est acceptable
+        if tracked_point is not None and segment_width is not None and valid_update:
+            current_point_meter = list(current_point_meter)
+            current_point_meter[1] = cy
+            overlay_points(image_np, tracked_point, 0, 255, 0, 'current tracked buoy')
+            cv2.line(image_np, (x, cy), (x + w, cy), (0, 0, 0), 5)
             current_point_msg = Float64MultiArray(data=current_point_meter)
             self.pub_tracked_point.publish(current_point_msg)
+            segment_msg = Float64MultiArray(data=[segment_width])
+            self.pub_tracked_segment.publish(segment_msg)
 
-        if desired_point is not None:
-            overlay_points(image_np, desired_point, 255, 0, 0, 'desired point')
-            desired_point_meter = convertOnePoint2meter(desired_point)
-            desired_point_msg = Float64MultiArray(data=desired_point_meter)
-            self.pub_desired_point.publish(desired_point_msg)
-
-
+        # Toujours afficher le point désiré
+        overlay_points(image_np, desired_point, 255, 0, 0, 'desired point')
+        desired_point_meter = convertOnePoint2meter(desired_point)
+        desired_point_msg = Float64MultiArray(data=desired_point_meter)
+        self.pub_desired_point.publish(desired_point_msg)
 
         cv2.imshow("image", image_np)
         cv2.waitKey(2)
         end_time = time.time()
-        elapsed_time = end_time-begin_time
+        elapsed_time = end_time - begin_time
         self.get_logger().warn(f"Computation with HSV took {elapsed_time*1000:.2f} milliseconds")
+
 
 def main(args=None):
     rclpy.init(args=args)

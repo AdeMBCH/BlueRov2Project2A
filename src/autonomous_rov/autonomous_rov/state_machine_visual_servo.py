@@ -45,9 +45,6 @@ class VisualServoing(Node):
         self.robot_speed_publisher = self.create_publisher(Twist, 'visual_servoing/robot_speed', 10)
         self.get_logger().info("Publishers succesfully created")
 
-
-
-
         # Adding default values to __init__
 
         self.desired_point = None
@@ -85,6 +82,8 @@ class VisualServoing(Node):
         self.pinger_confidence = 100
         self.pinger_distance = 10
         self.max_pinger_distance = 1.0
+
+
 
     def pingerCallback(self, msg):
         self.pinger_distance = msg.data[0]
@@ -146,11 +145,8 @@ class VisualServoing(Node):
 
 
     def segment_callback(self, msg):
-        x1, y1, x2, y2 = msg.data
 
-        self.dx = x1 - x2
-        self.dy = y1 - y2
-        self.current_width = np.sqrt(self.dx ** 2 + self.dy ** 2)
+        self.current_width = msg.data
 
         self.get_logger().info(f'curent width is {self.current_width}, error is {self.GOOD_WIDTH-self.current_width}')
 
