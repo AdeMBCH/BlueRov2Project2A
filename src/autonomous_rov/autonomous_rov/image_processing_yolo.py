@@ -71,9 +71,9 @@ class ImageProcessingWithYolo(Node):
         self.get_logger().info("Chargement du modèle YOLOv5...")
         self.model = torch.hub.load('/home/projet_sysmer/ros2_ws/src/yolov5',
                                     'custom',
-                                    path='/home/projet_sysmer/ros2_ws/src/yolov5/runs/train/exp3/weights/best.pt',
+                                    path='/home/projet_sysmer/ros2_ws/src/yolov5/runs/train/exp10/weights/best.pt',
                                     source='local')
-        self.model.conf = 0.40  # Seuil de confiance
+        self.model.conf = 0.10  # Seuil de confiance
         self.get_logger().info("Modèle chargé avec succès.")
 
         self.bridge = CvBridge()  # CvBridge for converting ROS images to OpenCV format

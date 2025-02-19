@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from json.encoder import INFINITY
 
 import rclpy
 import time
@@ -84,7 +85,7 @@ class MyVisualServoingNode(Node):
         self.depth_p0 = 0
 
         self.pinger_confidence = 0
-        self.pinger_distance = 0
+        self.pinger_distance = None
 
         self.Vmax_mot = 1900
         self.Vmin_mot = 1100
@@ -109,6 +110,16 @@ class MyVisualServoingNode(Node):
         self.I = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0001])
         self.D = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.001])
 
+        # pid for pinger
+        self.kp_ping = 1.0
+        self.ki_ping = 0.0
+        self.kd_ping = 0.0
+        self.error_ping = 0
+        self.integral_error_ping = 0
+        self.error_last_ping = 0
+        self.derivative_error_ping = 0
+
+
         self.motor_max_val = 1900
         self.motor_min_val = 1100
         self.Correction_yaw = 1500
@@ -123,7 +134,7 @@ class MyVisualServoingNode(Node):
 
         self.state = "SEARCHING"
         self.last_known_position = None
-        self.search_mode = "eight"
+        self.search_mode = "ellipse"
         self.start_time = time.time()
         self.timeout_duration = 1.0
 
@@ -515,13 +526,48 @@ class MyVisualServoingNode(Node):
         msg_override.channels[16] = 1500
         msg_override.channels[17] = 1500
 
-        # if self.pinger_distance < self.max_pinger_distance and self.pinger_confidence>90:
-        #     msg_override.channels[4] = 1450  # Throttle
-        #     msg_override.channels[3] = 1450  # Yaw
-        #
-        #     # self.get_logger().error("Distance too short")
+        if self.pinger_distance is not None and self.pinger_distance <= 0.8 and self.set_mode[1] and self.pinger_confidence>90:
+            corrected_yaw, corrected_forward = self.control_yaw_only()
+            msg_override.channels[3] = corrected_yaw
+            msg_override.channels[4] = corrected_forward
+            self.get_logger().info("Mode pinger activé, commande forward: " + str(corrected_yaw))
+
+        self.get_logger().info(f' Published new command to RCIN :'
+                               f' yaw : {msg_override.channels[3]}, '   #need to check
+                               f' thruttle : {msg_override.channels[4]}, '     #okay
+                               f' lateral lr : {1500}')    #okay
 
         self.overrideRCIN_publisher.publish(msg_override)
+
+    def control_yaw_only(self):
+        max_turn_duration = 2.0  # Durée maximale de rotation en secondes
+        current_time = time.time()
+
+        # Initialiser le timer de mode yaw si ce n'est pas déjà fait
+        if not hasattr(self, 'yaw_mode_start_time') or self.yaw_mode_start_time is None:
+            self.yaw_mode_start_time = current_time
+
+        # Si le temps écoulé dépasse la durée maximale, réinitialiser et retourner des commandes neutres
+        if current_time - self.yaw_mode_start_time > max_turn_duration:
+            self.get_logger().info("Durée maximale de rotation atteinte, arrêt du mode yaw.")
+            self.yaw_mode_start_time = None  # Réinitialisation pour la prochaine détection
+            return 1500, 1500  # Valeurs neutres pour yaw et forward
+
+        # Calcul PID basé sur la distance consigne (ici 0,7 m)
+        consigne_distance = 0.7
+        dt = 0.04  # Période d'échantillonnage
+        error_ping = -(consigne_distance - self.pinger_distance)
+        self.integral_error_ping += error_ping * dt
+        self.derivative_error_ping = (error_ping - self.error_last_ping) / dt
+        self.error_last_ping = error_ping
+
+        pid_output = self.kp_ping * error_ping + self.ki_ping * self.integral_error_ping + self.kd_ping * self.derivative_error_ping
+        avoidance_yaw = self.mapValueScalSat(pid_output)
+
+        # Pour le forward, on souhaite rester neutre en mode yaw uniquement
+        avoidance_forward = 1500
+
+        return avoidance_yaw, avoidance_forward
 
     def mapValueScalSat(self, value):
         # Correction_Vel and joy between -1 et 1
@@ -696,14 +742,26 @@ class MyVisualServoingNode(Node):
         elapsed_time = time.time() - self.start_time
 
         if self.search_mode == "spiral":
-            cmd_vel.linear.x = min(0.2 + elapsed_time * 0.01, 0.5)
-            cmd_vel.angular.z = 0.5 / (1 + elapsed_time * 0.1)
+            cmd_vel.linear.x = 0.2
+            cmd_vel.angular.z = 0.2
 
         elif self.search_mode == "eight":
             cmd_vel.linear.x = 0.2
             cmd_vel.angular.z = 0.5 * (-1) ** int(elapsed_time % 2)
 
-        self.get_logger().info(f"Searching buoy around {self.last_known_position}")
+        elif self.search_mode == "ellipse":
+            # Paramètres de l'ellipse
+            a = 0.2  # amplitude pour la vitesse en avant (surge)
+            b = 0.1  # amplitude pour la vitesse latérale (sway)
+            omega = 0.5  # fréquence en rad/s
+
+            # Équations paramétriques de l'ellipse
+            cmd_vel.linear.x = a * math.cos(omega * elapsed_time)
+            cmd_vel.linear.y = b * math.sin(omega * elapsed_time)
+            # On peut laisser la rotation nulle ou la définir selon un besoin particulier
+            cmd_vel.angular.z = 0.0
+
+        self.get_logger().info(f"Searching buoy around {self.last_known_position} (mode: {self.search_mode})")
         self.robot_speed_publisher.publish(cmd_vel)
 
     def reorient_to_last_known_position(self):
