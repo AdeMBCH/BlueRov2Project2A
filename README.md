@@ -48,11 +48,45 @@ ros2 launch autonomous_rov run_state_machine.launch
 
 ## Project Structure : image_processing_tracker.py
 
-- **image_processing_tracker.py**: This node performs image processing, including object detection and point tracking. **Make sure the camera topic is correct. You can check it with the following command:**
-  
-```bash
-  ros2 topic list
-```
+### Explanation of the HSV Script
+
+The HSV script is designed to track an object using a color-based detection approach. Its workflow includes the following steps:
+
+- **Conversion to HSV Space:**  
+  The captured image (received as a ROS message) is first converted to an OpenCV format, then transformed from BGR to HSV. This transformation makes it easier to isolate specific colors.
+
+- **Color Range Filtering:**  
+  Using a defined HSV value (often obtained by clicking on the image) along with a set tolerance, a mask is created. This mask retains only those pixels whose colors fall within the desired range.
+
+- **Tracked Point Detection:**  
+  The script identifies the filtered pixels from the mask and computes their average to determine the center of the tracked object.
+
+- **Segment Detection:**  
+  By analyzing the contours generated from the mask, the script identifies the largest contour, computes a bounding box, and deduces the extreme points (left and right). These points are then converted into meters using camera calibration parameters, allowing an estimation of the object’s width (segment).
+
+- **Data Publishing:**  
+  The tracked point, the segment (represented by its width), and a desired point (defaulted to the center of the image or defined via a mouse click) are published on ROS topics. This data is used by other parts of the system, such as the visual control module.
+
+---
+
+### Improvements Made to the HSV Script
+
+Several enhancements have been implemented to make HSV-based tracking more robust and accurate:
+
+- **Conditional Display and Publishing:**  
+  Overlays (annotations on the OpenCV image) and the publication of ROS messages occur only if both the tracked point and the segment are successfully detected. If either is missing, no overlay is drawn, preventing the display of erroneous information.
+
+- **Vertical Alignment of the Tracked Point:**  
+  The tracked point is now vertically aligned with the center of the segment. In other words, its vertical coordinate is adjusted to match that of the segment, ensuring visual consistency.
+
+- **Segment Width Filtering:**  
+  A check is performed to ensure that the segment’s width (calculated in meters) exceeds a minimum threshold (0.07 m). Segments failing to meet this threshold are rejected, reducing false detections or tracking of objects that are too small.
+
+- **Tracked Point Velocity Control:**  
+  The script calculates the movement speed of the tracked point between successive frames. If this speed exceeds a predefined threshold (e.g., 1 m/s), the new measurement is flagged as aberrant and ignored (or the last valid point is reused). This control helps prevent abrupt fluctuations caused by noise or detection errors.
+
+These improvements enhance the reliability of HSV-based tracking, ensuring optimal integration with the autonomous ROV’s visual servoing system.
+
 
   **If you encounter issues with image display, ensure you correctly modify the image conversion code:**
   

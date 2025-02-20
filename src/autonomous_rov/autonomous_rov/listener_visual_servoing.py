@@ -126,7 +126,7 @@ class MyVisualServoingNode(Node):
         self.Correction_depth = 1500
         self.homogeneous_transform = np.eye(4)
         self.thruttle = 1500
-        self.GOOD_WIDTH = 0.35
+        self.GOOD_WIDTH = np.array(0.35)
 
         self.previous_error = [0.0, 0.0, 0.0]
         self.error_integral = [0.0, 0.0, 0.0]
@@ -134,7 +134,7 @@ class MyVisualServoingNode(Node):
 
         self.state = "SEARCHING"
         self.last_known_position = None
-        self.search_mode = "ellipse"
+        self.search_mode = "eigth"
         self.start_time = time.time()
         self.timeout_duration = 1.0
 
@@ -156,12 +156,9 @@ class MyVisualServoingNode(Node):
             self.update_state()
 
     def segment_callback(self, msg):
-        x1, y1, x2, y2 = msg.data
 
-        self.dx = x1 - x2
-        self.dy = y1 - y2
-        self.current_width = np.sqrt(self.dx ** 2 + self.dy ** 2)
-        #
+        self.current_width = msg.data
+
         # self.get_logger().info(f'curent width is {self.current_width}')
 
 

@@ -73,7 +73,7 @@ class ImageProcessingWithYolo(Node):
                                     'custom',
                                     path='/home/projet_sysmer/ros2_ws/src/yolov5/runs/train/exp3/weights/best.pt',
                                     source='local')
-        self.model.conf = 0.20  # Seuil de confiance
+        self.model.conf = 0.60  # Seuil de confiance
         self.get_logger().info("Modèle chargé avec succès.")
 
         self.bridge = CvBridge()  # CvBridge for converting ROS images to OpenCV format
@@ -83,107 +83,121 @@ class ImageProcessingWithYolo(Node):
             self.image_callback,
             10)
 
-        # self.subscription = self.create_subscription(
-        #     CompressedImage,
-        #     '/br4/raspicam_node/image/compressed',
-        #     self.image_callback,
-        #     10)
+
+        self.last_tracked_point = None  # en mètres
+        self.last_time = None
+        self.max_speed = 1.5  # seuil de vitesse en m/s (à ajuster)
 
         cv2.namedWindow("Result")
         cv2.setMouseCallback("Result", click_detect)
 
     def image_callback(self, msg):
-        self.get_logger().info('Received new frame !')
+        self.get_logger().debug('Received new frame!')
         start_time = time.time()
 
-        image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        # image = self.bridge.compressed_imgmsg_to_cv2(msg)
-
-        global set_desired_point, current_width, current_point_meter
-
-        if image is None:
-            self.get_logger().error(f"Erreur : Impossible de charger l'image à partir de {self.image}")
+        # Conversion de l'image ROS vers OpenCV
+        try:
+            image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except Exception as e:
+            self.get_logger().error(f"Erreur lors de la conversion de l'image: {e}")
             return
 
-        image_height, image_width, _ = image.shape
+        if image is None:
+            self.get_logger().error("L'image convertie est None")
+            return
 
+
+        image_height, image_width, _ = image.shape
         desired_point = [image_width / 2, image_height / 2]
 
-        if set_desired_point:
-            desired_point = [mouseX, mouseY]
-            set_desired_point = False
-
-        # Conversion en RGB pour YOLOv5
+        # Conversion en RGB
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Mesurer le temps d'inférence
+        # Optimisation : désactiver le calcul des gradients pour l'inférence
+        with torch.no_grad():
+            results = self.model(image_rgb)
 
-        results = self.model(image_rgb)
-
-
-        # Récupérer les détections : [x1, y1, x2, y2, confiance, classe]
         detections = results.xyxy[0].cpu().numpy()
-        self.get_logger().info("Détections :")
-        for det in detections:
-            x1, y1, x2, y2, conf, cls = det
-            self.get_logger().info(
-                f"Classe: {int(cls)} ({self.model.names[int(cls)]}) - Confiance: {conf:.4f} - Coordonnées: {x1:.4f}, {y1:.4f}, {x2:.4f}, {y2:.4f}")
+
+        valid_update = True
+        tracked_point = None
+        segment_width = None
+        segment_y = None
+
+        if detections.shape[0] > 0:
+            # Traitement de la première détection
+            x1, y1, x2, y2, conf, cls = detections[0]
             overlay_box(image, [x1, y1, x2, y2], self.model.names[int(cls)], conf)
 
-        if detections.shape[0]>0:
-            x1, y1, x2, y2,_,_ = detections[0]
-
-            right_point= (int(x1), int((y1 + y2)//2))
-            left_point = (int(x2), int((y1 + y2) // 2))
-            # self.get_logger().info(right_point)
-            # # self.get_logger().info(type(right_point))
-            # Afficher le segment
+            segment_y = int((y1 + y2) // 2)
+            left_point = (int(x1), segment_y)
+            right_point = (int(x2), segment_y)
             cv2.line(image, left_point, right_point, (0, 0, 0), 5)
 
-            # Convertir en mètres
+            # Conversion en mètres
             left_point_meter = convertOnePoint2meter(left_point)
             right_point_meter = convertOnePoint2meter(right_point)
+            dx = left_point_meter[0] - right_point_meter[0]
+            dy = left_point_meter[1] - right_point_meter[1]
+            current_width = np.sqrt(dx ** 2 + dy ** 2) * 0.95  # ajustement éventuel
 
-            #publication du message
-            x1, y1 = left_point_meter
-            x2, y2 = right_point_meter
-            dx = x1 - x2
-            dy = y1 - y2
-            current_width = np.sqrt(dx ** 2 + dy ** 2)
-            current_width = current_width*0.95
-            segment_msg = Float64MultiArray(data=[current_width])
+            if current_width >= 0.07:
+                segment_width = current_width
+            else:
+                self.get_logger().debug(f"Segment width too small: {current_width:.4f}")
 
-            self.pub_tracked_segment.publish(segment_msg)
+            # Calculer le centre de la boîte pour le suivi
+            cx = int((x1 + x2) // 2)
+            tracked_point = [cx, segment_y]
 
-            cx,cy = int((x1+x2)//2), int((y1 + y2)//2)
-            cv2.circle(image,(int(cx),int(cy)),radius=5,color=(0,255,0))
-            current_point = [cx, cy]
-            overlay_points(image, current_point, 0, 255, 0, 'current tracked buoy')
-            current_point_meter = convertOnePoint2meter(current_point)
-            current_point_msg = Float64MultiArray(data=current_point_meter)
+            # Conversion en mètres du point suivi
+            current_point_meter = convertOnePoint2meter(tracked_point)
+
+            # Calcul de la vitesse du point suivi
+            current_time = time.time()
+            if self.last_tracked_point is not None and self.last_time is not None:
+                dt = current_time - self.last_time
+                if dt > 0:
+                    displacement = np.linalg.norm(np.array(current_point_meter) - np.array(self.last_tracked_point))
+                    speed = displacement / dt
+                    if speed > self.max_speed:
+                        self.get_logger().debug(f"Vitesse trop élevée: {speed:.2f} m/s, mise à jour ignorée")
+                        valid_update = False
+                        current_point_meter = self.last_tracked_point
+                    else:
+                        self.last_tracked_point = current_point_meter
+                        self.last_time = current_time
+                else:
+                    self.last_tracked_point = current_point_meter
+                    self.last_time = current_time
+            else:
+                self.last_tracked_point = current_point_meter
+                self.last_time = current_time
+
+        else:
+            self.get_logger().debug("Aucune détection avec YOLO, aucune publication pour tracked_point et segment.")
+
+        if tracked_point is not None and segment_width is not None and valid_update:
+            overlay_points(image, tracked_point, 0, 255, 0, 'current tracked buoy')
+            current_point_msg = Float64MultiArray(data=list(current_point_meter))
             self.pub_tracked_point.publish(current_point_msg)
+            segment_msg = Float64MultiArray(data=[segment_width])
+            self.pub_tracked_segment.publish(segment_msg)
+        else:
+            self.get_logger().debug(
+                "Point suivi ou segment manquant, ou vitesse trop élevée, aucune publication n'est effectuée.")
 
+        overlay_points(image, desired_point, 255, 0, 0, 'desired point')
+        desired_point_meter = convertOnePoint2meter(desired_point)
+        desired_point_msg = Float64MultiArray(data=desired_point_meter)
+        self.pub_desired_point.publish(desired_point_msg)
 
-        if desired_point is not None:
-            overlay_points(image, desired_point, 255, 0, 0, 'desired point')
-            desired_point_meter = convertOnePoint2meter(desired_point)
-            desired_point_msg = Float64MultiArray(data=desired_point_meter)
-            self.pub_desired_point.publish(desired_point_msg)
-
-
-
-
-
-
-        # Afficher l'image annotée dans une fenêtre OpenCV
         cv2.imshow("Result", image)
         cv2.waitKey(2)
 
         end_time = time.time()
-        inference_time = (end_time - start_time) * 1000  # en ms
-        self.get_logger().info(f"Inference time with YOLOv5Nano : {inference_time:.2f} milliseconds")
-
-
+        inference_time = (end_time - start_time) * 1000
+        self.get_logger().info(f"Inference time with YOLOv5: {inference_time:.2f} milliseconds")
 
 
 def main(args=None):
