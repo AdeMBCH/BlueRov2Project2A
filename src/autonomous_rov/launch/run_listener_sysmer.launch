@@ -1,0 +1,10 @@
+<launch>		
+	<group> 
+	  <arg name="namespace" default="bluerov2"/>
+
+
+	<node pkg="autonomous_rov" exec="listenerSS" name="listenerSS" namespace="$(var namespace)" output="screen">
+	</node>		
+		
+	</group>
+</launch>	

@@ -3,7 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ping-python" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/ultralytics" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/yolov5" vcs="Git" />
   </component>
 </project>

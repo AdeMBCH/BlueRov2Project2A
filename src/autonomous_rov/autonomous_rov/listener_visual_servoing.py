@@ -513,7 +513,7 @@ class MyVisualServoingNode(Node):
         msg_override.channels[6] = 1500
         msg_override.channels[7] = 1500
         msg_override.channels[8] = ligth_rc # light
-        msg_override.channels[9] = cam_rc  # camera
+        msg_override.channels[9] = cam_rc  # Camera_Tilt
         msg_override.channels[10] = 1500
         msg_override.channels[11] = 1500
         msg_override.channels[12] = 1500
