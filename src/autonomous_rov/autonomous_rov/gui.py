@@ -36,19 +36,15 @@ class BlueRovGUI:
         # Commande principale (MAVROS) dans un nouveau terminal
         command = f"""
         terminator --working-directory=~/ros2_ws -e '
-        # Compilation avec gestion d'erreurs
-        colcon build --symlink-install --packages-select autonomous_rov || {{
-            echo "Erreur de compilation - Vérifiez les dépendances";
-            exit 1;
-        }}
 
-        # Activation explicite de l'environnement
+        colcon build --symlink-install --packages-select autonomous_rov ||
+
         source install/setup.bash
 
         # Lancement du fichier launch dans un nouveau terminal
         gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_mavros.launch"
 
-        sleep 10
+        sleep 6
 
         gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_gamepad.launch"
 
