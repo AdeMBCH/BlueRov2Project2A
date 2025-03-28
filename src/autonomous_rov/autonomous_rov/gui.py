@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, GdkPixbuf
@@ -10,6 +11,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from rclpy.node import Node
 import subprocess
+import os
 
 class BlueRovGUI:
     def __init__(self):
@@ -32,40 +34,21 @@ class BlueRovGUI:
 
     def on_launch_button_clicked(self, widget):
         self.status_label.set_text("Status: Building...")
-        
-        # Commande principale (MAVROS) dans un nouveau terminal
-        command = f"""
-        terminator --working-directory=~/ros2_ws -e '
 
-        colcon build --symlink-install --packages-select autonomous_rov ||
+        commands = [
+            "ros2 launch autonomous_rov run_mavros.launch",
+            "ros2 launch autonomous_rov run_gamepad.launch",
+            "ros2 launch autonomous_rov run_video.launch",
+            "ros2 launch autonomous_rov run_listener_sysmer.launch"
+        ]
 
-        source install/setup.bash
-
-        # Lancement du fichier launch dans un nouveau terminal
-        gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_mavros.launch"
-
-        sleep 6
-
-        gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_gamepad.launch"
-
-        sleep 5
-
-        gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_video.launch"
-
-        sleep 3
-
-        gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_listener_sysmer.launch"
-
-        # Garde le terminal ouvert pour interagir
-        exec bash
-        '
-        """
-        subprocess.Popen(command, shell=True)
-
-
+        for command in commands:
+            subprocess.Popen(f"gnome-terminal -- bash -c 'source ~/ros2_ws/install/setup.bash && {command}; exec bash'", shell=True)
 
     def on_log_button_clicked(self, widget):
-        print("Logging system information...")
+        print("Lancement du script datavideologger.py...")
+        script_path = "/home/projet_sysmer/ros2_ws/src/autonomous_rov/autonomous_rov/datavideologger.py"  # Assurez-vous que ce chemin est correct
+        subprocess.Popen(f"gnome-terminal -- bash -c 'python3 {script_path}; exec bash'", shell=True)
 
 class VideoSubscriber(Node):
     def __init__(self, gui):
@@ -87,7 +70,6 @@ class VideoSubscriber(Node):
             if (current_time - self.last_frame_time) > (1.0 / self.frame_rate):
                 cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
                 
-                # Conversion BGR vers RGB
                 cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
                 
                 height, width = cv_image.shape[:2]
