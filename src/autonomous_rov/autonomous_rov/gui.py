@@ -33,6 +33,7 @@ class BlueRovGUI:
     def on_launch_button_clicked(self, widget):
         self.status_label.set_text("Status: Building...")
         
+        # Commande principale (MAVROS) dans un nouveau terminal
         command = f"""
         terminator --working-directory=~/ros2_ws -e '
 
@@ -43,7 +44,7 @@ class BlueRovGUI:
         # Lancement du fichier launch dans un nouveau terminal
         gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_mavros.launch"
 
-        sleep 3
+        sleep 6
 
         gnome-terminal --working-directory=~/ros2_ws -e "ros2 launch autonomous_rov run_gamepad.launch"
 
@@ -86,6 +87,7 @@ class VideoSubscriber(Node):
             if (current_time - self.last_frame_time) > (1.0 / self.frame_rate):
                 cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
                 
+                # Conversion BGR vers RGB
                 cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
                 
                 height, width = cv_image.shape[:2]
