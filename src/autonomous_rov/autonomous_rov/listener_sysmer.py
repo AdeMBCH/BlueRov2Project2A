@@ -157,10 +157,197 @@ class MyVisualServoingNode(Node):
 
         self.recon_time = 20.0 
 
+        # Initialisations pour la trajectoire et le PID
+        self.trajectory_start_time = None
+        self.z_init = 0.0  # Profondeur initiale
+        self.z_final = -0.3  # Profondeur finale (négative pour descendre)
+        self.t_final = 20.0  # Temps final
+        self.integral = 0.0  # Initialize integral term
+        self.integral_max = 0.2  # Limites de l'intégrale
+        self.integral_min = -0.2
+
+        self.current_depth = 0.0
+
+        # Initialisations pour le filtre alpha-beta
+        self.last_depth = 0.0  # Initial depth
+        self.last_heave = 0.0  # Initial heave velocity
+
+        self.start_time = None
+        self.last_time = None  # Ajout pour le calcul de dt
+
+        # Paramètres pour le calcul de la profondeur
+        self.rho = 1000.0  # Densité de l'eau (kg/m³)
+        self.g = 9.80665  # Accélération gravitationnelle (m/s²)
+        self.p0 = 101100.0  # Pression atmosphérique au démarrage (Pa)
+        self.depth_p0 = 0.0  # Profondeur au démarrage (m)
+        self.init_p0 = True  # Indique si la profondeur au démarrage a été initialisée
+
+    def generate_cubic_trajectory(self, z_init, z_final, t_final, t):
+        """
+        Génère une trajectoire cubique pour le contrôle de la profondeur.
+
+        Args:
+            z_init (float): Profondeur initiale (m).
+            z_final (float): Profondeur finale désirée (m).
+            t_final (float): Temps pour atteindre la profondeur finale (s).
+            t (float): Temps actuel (s).
+
+        Returns:
+            tuple: Profondeur désirée et sa dérivée au temps t.
+        """
+        if t < t_final:
+            a2 = (3 * (z_final - z_init)) / (t_final ** 2)
+            a3 = (-2 * (z_final - z_init)) / (t_final ** 3)
+            z_desired = z_init + a2 * t**2 + a3 * t**3
+            z_dot_desired = 2 * a2 * t + 3 * a3 * t**2
+        else:
+            z_desired = z_final
+            z_dot_desired = 0.0
+
+        return z_desired, z_dot_desired
+
+    def depth_control_pid(self, desired_depth, desired_velocity, current_depth, current_velocity, dt):
+        """
+        Calculates the control force for depth using a PID controller with floatability compensation.
+
+        Args:
+            desired_depth (float): The desired depth in meters.
+            desired_velocity (float): The desired heave velocity in meters per second.
+            current_depth (float): The current depth in meters.
+            current_velocity (float): The current heave velocity in meters per second.
+            dt (float): The time step in seconds.
+
+        Returns:
+            float: The control force to be applied to the vertical thrusters.
+        """
+        Kp = 0.1
+        Ki = 0.01
+        Kd = 0.02
+        floatability = -0.2  # Measured floatability in kgf (adjust this value)
+
+        error = desired_depth - current_depth
+        
+        # Réinitialiser l'intégrale si l'erreur est faible et la vitesse est dans la bonne direction
+        if abs(error) < 0.02 and abs(current_velocity) < 0.01:
+            self.integral = 0.0
+        else:
+            self.integral += error * dt  # Update integral term
+            self.integral = max(min(self.integral, self.integral_max), self.integral_min) # Limiter l'intégrale
+
+        derivative = desired_velocity - current_velocity  # Velocity error
+
+        control_force = Kp * error + Ki * self.integral + Kd * derivative + floatability
+
+        print(f"desired_depth: {desired_depth}, current_depth: {current_depth}, error: {error}, integral: {self.integral}, derivative: {derivative}, control_force: {control_force}")  # Surveiller les valeurs
+        return control_force
+
+    def alpha_beta_filter(self, depth, dt):
+        """
+        Estimates the heave (vertical velocity) using an alpha-beta filter.
+        """
+        if dt <= 0:
+            return self.last_heave  # Prevent division by zero
+
+        alpha = 0.1
+        beta = 0.01
+
+        # Prediction step
+        predicted_depth = self.last_depth + self.last_heave * dt
+        residual = depth - predicted_depth
+
+        # Update step
+        heave = self.last_heave + beta * residual / max(dt, 1e-6)
+        depth = predicted_depth + alpha * residual
+
+        # Store current values for next iteration
+        self.last_depth = depth
+        self.last_heave = heave
+
+        return heave
+
+
+    def convert_force_to_pwm(self, force):
+        """
+        Convert a force in kgf to a PWM signal for the thrusters.
+        """
+        if force < 0:  # Force négative (vers le bas)
+            pwm_value = 1500 + force * (400)  # Ajuster la pente au besoin
+        else:  # Force positive (vers le haut)
+            pwm_value = 1500 + force * (-400)   # Ajuster la pente au besoin
+
+        # Limiter les valeurs PWM pour éviter d'endommager les moteurs
+        pwm_value = max(min(pwm_value, 1900), 1100)
+
+        return int(pwm_value)
+    
+    def update_depth(self, pressure):
+        """
+        Met à jour la profondeur actuelle à partir de la pression mesurée.
+        """
+        try:
+            # Conversion de la pression en Pa
+            pressure_pa = pressure * 100.0
+            
+            if self.init_p0:
+                # Initialisation au démarrage
+                self.depth_p0 = (pressure_pa - self.p0) / (self.rho * self.g)
+                self.init_p0 = False
+
+            # Calcul de la profondeur relative
+            self.current_depth = (pressure_pa - self.p0) / (self.rho * self.g) - self.depth_p0
+            
+            # Mise à jour du filtre alpha-beta
+            self.last_depth = self.current_depth
+            self.last_heave = 0.0  # Reset de la vitesse initiale
+            
+            print(f"Profondeur actuelle : {self.current_depth:.2f} m")
+            
+        except Exception as e:
+            print(f"Erreur de calcul de la profondeur : {e}")
+    
     def auto_mode_callback(self):
         if self.set_mode[1]:
-
             self.update_state()
+
+    def auto_mode_callback2(self):
+        if self.set_mode[1]:
+            # Initialiser le temps de départ si ce n'est pas déjà fait
+            if self.start_time is None:
+                self.start_time = time.time()
+
+            # Calcul du pas de temps
+            current_time = time.time()
+            dt = current_time - (self.last_time or current_time)
+            self.last_time = current_time
+
+            # Générer la profondeur désirée à partir de la trajectoire polynomiale
+            elapsed_time = current_time - self.start_time
+            desired_depth, desired_velocity = self.generate_cubic_trajectory(
+                self.z_init, self.z_final, self.t_final, elapsed_time
+            )
+
+            # Estimer la vitesse verticale (heave) avec le filtre alpha-beta
+            heave_velocity = self.alpha_beta_filter(self.current_depth, dt)
+
+            # Calculer la force de contrôle avec compensation de flottabilité
+            control_force = self.depth_control_pid(
+                desired_depth,
+                desired_velocity,
+                self.current_depth,
+                heave_velocity,
+                dt,
+            )
+
+            # Convertir la force en commande PWM
+            pwm_value = self.convert_force_to_pwm(control_force)
+
+            print(f"pwm_value: {pwm_value}")
+
+            # Envoyer la commande PWM aux propulseurs verticaux
+            self.setOverrideRCIN(1500, 1500, pwm_value, 1500, 1500, 1500,
+                                self.light_rc_value, self.cam_rc_value)
+
+
 
     def segment_callback(self, msg):
 
