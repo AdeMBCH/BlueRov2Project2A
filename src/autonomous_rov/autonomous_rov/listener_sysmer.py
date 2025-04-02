@@ -149,13 +149,19 @@ class MyVisualServoingNode(Node):
         self.light_rc_value = 1100 # from 1100 to 1900, light off is 1100
         self.light_rc_value_filtered = 0.0
         self.smoothing_factor = 0.2 # 1 = no smooth, 0 = full smooth
+
+
         ##### timer for auto mode #####
         timer_period = 0.10  # 50 msec - 20 Hz, above IMU frequency
         self.auto_timer = self.create_timer(timer_period, self.auto_mode_callback)
 
         self.start_recon_time = 0.0
-
-        self.recon_time = 20.0 
+        self.start_checking_time = 0.0
+        self.recon_time = 20.0
+        self.checking_time = 5.0
+        self.obstacle = [False,False]
+        self.check_iteration = 0
+        self.last_turn = "right"
 
         # Initialisations pour la trajectoire et le PID
         self.trajectory_start_time = None
@@ -279,31 +285,6 @@ class MyVisualServoingNode(Node):
         pwm_value = max(min(pwm_value, 1900), 1100)
 
         return int(pwm_value)
-    
-    def update_depth(self, pressure):
-        """
-        Met à jour la profondeur actuelle à partir de la pression mesurée.
-        """
-        try:
-            # Conversion de la pression en Pa
-            pressure_pa = pressure * 100.0
-            
-            if self.init_p0:
-                # Initialisation au démarrage
-                self.depth_p0 = (pressure_pa - self.p0) / (self.rho * self.g)
-                self.init_p0 = False
-
-            # Calcul de la profondeur relative
-            self.current_depth = (pressure_pa - self.p0) / (self.rho * self.g) - self.depth_p0
-            
-            # Mise à jour du filtre alpha-beta
-            self.last_depth = self.current_depth
-            self.last_heave = 0.0  # Reset de la vitesse initiale
-            
-            print(f"Profondeur actuelle : {self.current_depth:.2f} m")
-            
-        except Exception as e:
-            print(f"Erreur de calcul de la profondeur : {e}")
     
     def auto_mode_callback(self):
         if self.set_mode[1]:
@@ -470,6 +451,14 @@ class MyVisualServoingNode(Node):
             return
 
         thrust_y = 600
+        if self.obstacle==[True,False]:
+            thrust_y = -thrust_y
+        elif self.obstacle==[False,True]:
+            thrust_y = thrust_y
+        elif self.obstacle==[True,True]:
+            self.state="RECON"
+            self.check_iteration=100
+            return
         error, error_integral, error_derivative = self.compute_error()
 
 
@@ -562,6 +551,37 @@ class MyVisualServoingNode(Node):
                                 f' thruttle : {forward_reverse}, '  # okay
                                 f' lateral lr : {1500},'  # okay
                                 f' camera tilt : {self.cam_rc_value}')  # okay
+
+    def check_side(self,direction):
+        if(direction=='right'):
+            yaw_left_right = 1510
+            self.last_turn="left"
+            if self.pinger_distance is not None and self.pinger_distance <= 0.8 and self.set_mode[1] and self.pinger_confidence > 90:
+                self.obstacle[0] = True
+        elif(direction=='left'):
+            yaw_left_right = 1490
+            self.last_turn="right"
+            if self.pinger_distance is not None and self.pinger_distance <= 0.8 and self.set_mode[1] and self.pinger_confidence > 90:
+                self.obstacle[1] = True
+        else:
+            self.get_logger().error("false or no direction provided")
+            self.state = "RECON"
+            return
+        self.setOverrideRCIN(1500, 1500, 1500,
+                        yaw_left_right, 1500, 1500, self.light_rc_value, self.cam_rc_value)
+
+
+    def turn_side(self,direction):
+        if(direction=='right'):
+            yaw_left_right = 1510
+        elif(direction=='left'):
+            yaw_left_right = 1490
+        else:
+            self.get_logger().error("false or no direction provided")
+            self.state = "RECON"
+            return
+        self.setOverrideRCIN(1500, 1500, 1500,
+                            yaw_left_right, 1500, 1500, self.light_rc_value, self.cam_rc_value)
 
 
     def compute_visual_servo(self):
@@ -1072,49 +1092,81 @@ class MyVisualServoingNode(Node):
 
     def update_state(self):
 
-        if self.state == "PRESEARCHING":
-            if self.tracked_point is not None:
-                self.buoy_detected = True
-                self.state = 'RECON'
-                self.start_recon_time = time.time()
-                self.get_logger().info(f"La bouée vient d'être retrouvée...")
-                return
-            self.search_for_buoy()
+            if self.state == "PRESEARCHING":
+                if self.tracked_point is not None:
+                    self.buoy_detected = True
+                    self.state = 'RECON'
+                    self.start_recon_time = time.time()
+                    self.check_iteration = 0
+                    self.get_logger().info(f"La bouée vient d'être retrouvée...")
+                    return
+                self.search_for_buoy()
+
+            elif self.state == "RECON":
+                current_time = time.time()
+                self.control_camera_tilt()
+                self.visual_circle()
 
 
-
-        elif self.state == "RECON":
-            current_time = time.time()
-            self.control_camera_tilt()
-            self.visual_circle()
             if self.last_tracked_time and (current_time - self.last_tracked_time > self.timeout_duration):
                 self.state = 'LOST'
                 self.get_logger().warn("Tracked point lost! Switching to LOST state.")
                 self.tracked_point = None
+
+
             if (current_time - self.start_recon_time > self.recon_time) and self.tracked_point is not None:
                 self.state = 'TRACKING'
                 self.get_logger().info(f"Fin de la reconnaissance, début du suivi")
+
+
+            if current_time - self.start_recon_time > self.recon_time/4*(self.check_iteration+1) :
+                self.start_checking_time = time.time()
+                self.state = "CHECKING"
+
+
+            elif self.state == "CHECKING":
+                current_time = time.time()
+                if self.obstacle[1] == True:
+                    self.check_side("right")
+                else:
+                    self.check_side("left")
+                if (current_time - self.start_checking_time > self.checking_time):
+                    self.check_iteration += 1
+                    self.state = 'REPOSITIONING'
+                    self.start_checking_time = time.time()
+
+
+
+
+            elif self.state == "REPOSITIONING":
+                if (current_time - self.start_checking_time > self.checking_time):
+                    self.state = 'RECON'
+                if self.last_turn == "right":
+                    self.turn_side("left")
+                elif self.last_turn == "left":
+                    self.turn_side("right")
+
         
-        elif self.state == "SEARCHING":
-            if self.tracked_point is not None:
-                self.buoy_detected = True
-                self.state = 'TRACKING'
-                self.get_logger().info(f"La bouée vient d'être retrouvée...")
-                return
+            elif self.state == "SEARCHING":
+                if self.tracked_point is not None:
+                    self.buoy_detected = True
+                    self.state = 'TRACKING'
+                    self.get_logger().info(f"La bouée vient d'être retrouvée...")
+                    return
 
-            self.search_for_buoy()
+                self.search_for_buoy()
 
-        elif self.state == "TRACKING":
-            current_time = time.time()
-            self.control_camera_tilt()
-            self.compute_visual_servo()
-            if self.last_tracked_time and (current_time - self.last_tracked_time > self.timeout_duration):
-                self.state = 'LOST'
-                self.get_logger().warn("Tracked point lost! Switching to LOST state.")
-                self.tracked_point = None
+            elif self.state == "TRACKING":
+                current_time = time.time()
+                self.control_camera_tilt()
+                self.compute_visual_servo()
+                if self.last_tracked_time and (current_time - self.last_tracked_time > self.timeout_duration):
+                    self.state = 'LOST'
+                    self.get_logger().warn("Tracked point lost! Switching to LOST state.")
+                    self.tracked_point = None
 
-        elif self.state == "LOST":
-            self.reorient_to_last_known_position()
+            elif self.state == "LOST":
+                self.reorient_to_last_known_position()
 
     def search_for_buoy(self):
         cmd_vel = Twist()
