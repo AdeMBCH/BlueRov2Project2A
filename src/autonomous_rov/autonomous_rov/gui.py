@@ -50,6 +50,17 @@ class BlueRovGUI:
         script_path = "/home/projet_sysmer/ros2_ws/src/autonomous_rov/autonomous_rov/datavideologger.py"  # Assurez-vous que ce chemin est correct
         subprocess.Popen(f"gnome-terminal -- bash -c 'python3 {script_path}; exec bash'", shell=True)
 
+    def on_relaunch_button_clicked(self, widget):
+        self.status_label.set_text("Status: Relaunching...")
+
+        commands = [
+            "ros2 launch autonomous_rov run_listener_sysmer.launch"
+        ]
+
+        for command in commands:
+            subprocess.Popen(f"gnome-terminal -- bash -c 'source ~/ros2_ws/install/setup.bash && {command}; exec bash'", shell=True)
+
+
 class VideoSubscriber(Node):
     def __init__(self, gui):
         super().__init__('blue_rov_video_subscriber')
