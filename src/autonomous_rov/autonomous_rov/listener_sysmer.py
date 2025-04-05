@@ -56,8 +56,7 @@ class MyVisualServoingNode(Node):
         self.subcmdvel = self.create_subscription(Twist, "cmd_vel", self.velCallback, qos_profile=qos_profile)
         self.subimu = self.create_subscription(Imu, "imu/data", self.OdoCallback, qos_profile=qos_profile)
 
-        self.subrel_alt = self.create_subscription(Float64, "global_position/rel_alt", self.RelAltCallback,
-                                                   qos_profile=qos_profile)
+        #self.subrel_alt = self.create_subscription(Float64, "global_position/rel_alt", self.RelAltCallback,qos_profile=qos_profile)
 
         self.desired_point_sub = self.create_subscription(Float64MultiArray, '/bluerov2/desired_point',
                                                           self.desired_point_callback, 10)
@@ -78,6 +77,7 @@ class MyVisualServoingNode(Node):
         self.init_p0 = True
         self.arming = False
         self.move = False
+        
 
         self.angle_roll_ajoyCallback0 = 0.0
         self.angle_pitch_a0 = 0.0
@@ -157,22 +157,27 @@ class MyVisualServoingNode(Node):
 
         self.start_recon_time = 0.0
         self.start_checking_time = 0.0
-        self.recon_time = 20.0
-        self.checking_time = 5.0
+        self.recon_time = 40.0
+        self.checking_time = 1.5
         self.obstacle = [False,False]
         self.check_iteration = 0
         self.last_turn = "right"
 
+        
+
         # Initialisations pour la trajectoire et le PID
         self.trajectory_start_time = None
         self.z_init = 0.0  # Profondeur initiale
-        self.z_final = -0.3  # Profondeur finale (négative pour descendre)
+        self.z_final = -0.25  # Profondeur finale (négative pour descendre)
         self.t_final = 20.0  # Temps final
         self.integral = 0.0  # Initialize integral term
         self.integral_max = 0.2  # Limites de l'intégrale
         self.integral_min = -0.2
 
+        self.desired_depth=self.z_final
         self.current_depth = 0.0
+
+        self.pwm_asserv_prof = 1500
 
         # Initialisations pour le filtre alpha-beta
         self.last_depth = 0.0  # Initial depth
@@ -226,9 +231,9 @@ class MyVisualServoingNode(Node):
         Returns:
             float: The control force to be applied to the vertical thrusters.
         """
-        Kp = 0.1
-        Ki = 0.01
-        Kd = 0.02
+        Kp = 1.0
+        Ki = 0.2
+        Kd = 0.0
         floatability = -0.2  # Measured floatability in kgf (adjust this value)
 
         error = desired_depth - current_depth
@@ -244,7 +249,6 @@ class MyVisualServoingNode(Node):
 
         control_force = Kp * error + Ki * self.integral + Kd * derivative + floatability
 
-        print(f"desired_depth: {desired_depth}, current_depth: {current_depth}, error: {error}, integral: {self.integral}, derivative: {derivative}, control_force: {control_force}")  # Surveiller les valeurs
         return control_force
 
     def alpha_beta_filter(self, depth, dt):
@@ -289,46 +293,6 @@ class MyVisualServoingNode(Node):
     def auto_mode_callback(self):
         if self.set_mode[1]:
             self.update_state()
-
-    def auto_mode_callback2(self):
-        if self.set_mode[1]:
-            # Initialiser le temps de départ si ce n'est pas déjà fait
-            if self.start_time_filter is None:
-                self.start_time_filter = time.time()
-
-            # Calcul du pas de temps
-            current_time = time.time()
-            dt = current_time - (self.last_time or current_time)
-            self.last_time = current_time
-
-            # Générer la profondeur désirée à partir de la trajectoire polynomiale
-            elapsed_time = current_time - self.start_time_filter
-            desired_depth, desired_velocity = self.generate_cubic_trajectory(
-                self.z_init, self.z_final, self.t_final, elapsed_time
-            )
-
-            # Estimer la vitesse verticale (heave) avec le filtre alpha-beta
-            heave_velocity = self.alpha_beta_filter(self.current_depth, dt)
-
-            # Calculer la force de contrôle avec compensation de flottabilité
-            control_force = self.depth_control_pid(
-                desired_depth,
-                desired_velocity,
-                self.current_depth,
-                heave_velocity,
-                dt,
-            )
-
-            # Convertir la force en commande PWM
-            pwm_value = self.convert_force_to_pwm(control_force)
-
-            print(f"pwm_value: {pwm_value}")
-
-            # Envoyer la commande PWM aux propulseurs verticaux
-            self.setOverrideRCIN(1500, 1500, pwm_value, 1500, 1500, 1500,
-                                self.light_rc_value, self.cam_rc_value)
-
-
 
     def segment_callback(self, msg):
 
@@ -542,7 +506,8 @@ class MyVisualServoingNode(Node):
 
 
         # Send commands to robot
-        self.setOverrideRCIN(1500, 1500, 1500,
+        
+        self.setOverrideRCIN(1500, 1500, self.pwm_asserv_prof,
                                 yaw_left_right, forward_reverse, lateral_left_right, self.light_rc_value, self.cam_rc_value)
 
 
@@ -550,38 +515,37 @@ class MyVisualServoingNode(Node):
                                 f' yaw : {yaw_left_right}, '  # need to check
                                 f' thruttle : {forward_reverse}, '  # okay
                                 f' lateral lr : {1500},'  # okay
-                                f' camera tilt : {self.cam_rc_value}')  # okay
+                                f' camera tilt : {self.cam_rc_value},'
+                                f'pwm_asserv_prof : {self.pwm_asserv_prof},')
 
     def check_side(self,direction):
-        if(direction=='right'):
-            yaw_left_right = 1510
-            self.last_turn="left"
-            if self.pinger_distance is not None and self.pinger_distance <= 0.8 and self.set_mode[1] and self.pinger_confidence > 90:
-                self.obstacle[0] = True
-        elif(direction=='left'):
-            yaw_left_right = 1490
-            self.last_turn="right"
-            if self.pinger_distance is not None and self.pinger_distance <= 0.8 and self.set_mode[1] and self.pinger_confidence > 90:
-                self.obstacle[1] = True
-        else:
-            self.get_logger().error("false or no direction provided")
-            self.state = "RECON"
-            return
-        self.setOverrideRCIN(1500, 1500, 1500,
-                        yaw_left_right, 1500, 1500, self.light_rc_value, self.cam_rc_value)
+       if(direction=='left'):
+           yaw_left_right = 1420
+           self.last_turn="left"
+           if self.pinger_distance is not None and self.pinger_distance <= 0.8 and self.set_mode[1] and self.pinger_confidence > 90:
+               self.obstacle[0] = True
+       elif(direction=='right'):
+           yaw_left_right = 1580
+           self.last_turn="right"
+           if self.pinger_distance is not None and self.pinger_distance <= 0.8 and self.set_mode[1] and self.pinger_confidence > 90:
+               self.obstacle[1] = True
+       else:
+           self.get_logger().error("false or no direction provided")
+           self.state = "RECON"
+           return
+       self.setOverrideRCIN(1500, 1500, self.pwm_asserv_prof,yaw_left_right, 1500, 1500, self.light_rc_value, self.cam_rc_value)
 
 
     def turn_side(self,direction):
-        if(direction=='right'):
-            yaw_left_right = 1510
-        elif(direction=='left'):
-            yaw_left_right = 1490
-        else:
-            self.get_logger().error("false or no direction provided")
-            self.state = "RECON"
-            return
-        self.setOverrideRCIN(1500, 1500, 1500,
-                            yaw_left_right, 1500, 1500, self.light_rc_value, self.cam_rc_value)
+       if(direction=='left'):
+           yaw_left_right = 1420
+       elif(direction=='right'):
+           yaw_left_right = 1580
+       else:
+           self.get_logger().error("false or no direction provided")
+           self.state = "RECON"
+           return
+       self.setOverrideRCIN(1500, 1500, self.pwm_asserv_prof,yaw_left_right, 1500, 1500, self.light_rc_value, self.cam_rc_value)
 
 
     def compute_visual_servo(self):
@@ -656,7 +620,7 @@ class MyVisualServoingNode(Node):
         #self.control_lights(forward_reverse,yaw_left_right)
 
         # Send commands to robot
-        self.setOverrideRCIN(1500, 1500, 1500,
+        self.setOverrideRCIN(1500, 1500, self.pwm_asserv_prof,
                               yaw_left_right, forward_reverse, 1500, self.light_rc_value, self.cam_rc_value)
 
         self.get_logger().info(f' Published new command to RCIN :'
@@ -1017,18 +981,47 @@ class MyVisualServoingNode(Node):
         # yaw command to be adapted using sensor feedback
         self.Correction_yaw = 1500
 
-    def RelAltCallback(self, data):
-        if (self.init_p0):
-            # 1st execution, init
-            self.depth_p0 = data
-            self.init_p0 = False
-        # setup depth servo control here
-        # ...
+    def RelAltCallback(self, msg):
+        """
+        Callback function to get the relative altitude of the robot.
+        This altitude is used as the current depth for depth control.
+        """
+        if self.set_mode[1]:
+            self.current_depth = msg.data
+            self.get_logger().info(f"Current depth: {self.current_depth}")
 
-        # update Correction_depth
-        Correction_depth = 1500
-        self.Correction_depth = int(Correction_depth)
-        # Send PWM commands to motors in timer
+            if self.start_time_filter is None:
+                self.start_time_filter = time.time()
+
+            # Calcul du pas de temps
+            current_time = time.time()
+            dt = current_time - (self.last_time or current_time)
+            self.last_time = current_time
+
+            # Générer la profondeur désirée à partir de la trajectoire polynomiale
+            elapsed_time = current_time - self.start_time_filter
+            desired_depth, desired_velocity = self.generate_cubic_trajectory(
+                self.current_depth, self.desired_depth, self.t_final, elapsed_time
+                )
+
+            # Estimer la vitesse verticale (heave) avec le filtre alpha-beta
+            heave_velocity = self.alpha_beta_filter(self.current_depth, dt)
+
+            # Calculer la force de contrôle avec compensation de flottabilité
+            control_force = self.depth_control_pid(
+                desired_depth,
+                desired_velocity,
+                self.current_depth,
+                heave_velocity,
+                dt,
+                )
+
+            # Convertir la force en commande PWM
+            pwm_value = self.convert_force_to_pwm(control_force)
+            self.pwm_asserv_prof = pwm_value
+
+                # Envoyer la commande PWM aux propulseurs verticaux
+            #self.setOverrideRCIN(1500, 1500, self.pwm_asserv_prof, 1500, 1500, 1500,self.light_rc_value, self.cam_rc_value)
 
     def DvlCallback(self, data):
         u = data.velocity.x  # Linear surge velocity
@@ -1104,12 +1097,37 @@ class MyVisualServoingNode(Node):
             self.control_camera_tilt()
             self.visual_circle()
             if self.last_tracked_time and (current_time - self.last_tracked_time > self.timeout_duration):
-                self.state = 'LOST'
-                self.get_logger().warn("Tracked point lost! Switching to LOST state.")
+                self.state = 'REPOSITIONING'
+                self.get_logger().warn("Tracked point lost while reconizing ! Switching to Repositioning state.")
                 self.tracked_point = None
             if (current_time - self.start_recon_time > self.recon_time) and self.tracked_point is not None:
                 self.state = 'TRACKING'
                 self.get_logger().info(f"Fin de la reconnaissance, début du suivi")
+            if current_time - self.start_recon_time > self.recon_time/4*(self.check_iteration+1) :
+                self.start_checking_time = time.time()
+                self.state = "CHECKING"
+                self.get_logger().info(f"VA VERS ETAT CHECKING")
+
+        elif self.state == "CHECKING":
+            self.get_logger().info(f"CHECKING")
+            current_time = time.time()
+            if self.obstacle[1] == True:
+                self.check_side("left")
+            else:
+                self.check_side("right")
+            if (current_time - self.start_checking_time > self.checking_time):
+                self.check_iteration += 1
+                self.state = 'REPOSITIONING'
+
+        elif self.state == "REPOSITIONING":
+            self.get_logger().info(f"REPOSITIONING")
+            if self.tracked_point is not None:
+                self.state = "RECON"
+                return
+            if self.last_turn == "right":
+                self.turn_side("left")
+            elif self.last_turn == "left":
+                self.turn_side("right")
         
         elif self.state == "SEARCHING":
             if self.tracked_point is not None:
