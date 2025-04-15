@@ -55,8 +55,7 @@ class MyVisualServoingNode(Node):
         self.subjoy = self.create_subscription(Joy, "joy", self.joyCallback, qos_profile=qos_profile)
         self.subcmdvel = self.create_subscription(Twist, "cmd_vel", self.velCallback, qos_profile=qos_profile)
         self.subimu = self.create_subscription(Imu, "imu/data", self.OdoCallback, qos_profile=qos_profile)
-
-        #self.subrel_alt = self.create_subscription(Float64, "global_position/rel_alt", self.RelAltCallback,qos_profile=qos_profile)
+        self.subrel_alt = self.create_subscription(Float64, "/bluerov2/global_position/rel_alt", self.RelAltCallback,qos_profile=qos_profile)
 
         self.desired_point_sub = self.create_subscription(Float64MultiArray, '/bluerov2/desired_point',
                                                           self.desired_point_callback, 10)
@@ -135,7 +134,7 @@ class MyVisualServoingNode(Node):
 
         self.state = "INIT"
         self.last_known_position = None
-        self.search_mode = "spiral"
+        self.search_mode = "eight"
         self.start_time = time.time()
         self.timeout_duration = 1.0
 
@@ -231,19 +230,19 @@ class MyVisualServoingNode(Node):
         Returns:
             float: The control force to be applied to the vertical thrusters.
         """
-        Kp = 1.0
-        Ki = 0.2
+        Kp = 2.0
+        Ki = 0.1
         Kd = 0.0
         floatability = -0.2  # Measured floatability in kgf (adjust this value)
 
         error = desired_depth - current_depth
         
-        # Réinitialiser l'intégrale si l'erreur est faible et la vitesse est dans la bonne direction
+        # Réinitialize the integral if the error is too low and the speed is in the good direction
         if abs(error) < 0.02 and abs(current_velocity) < 0.01:
             self.integral = 0.0
         else:
             self.integral += error * dt  # Update integral term
-            self.integral = max(min(self.integral, self.integral_max), self.integral_min) # Limiter l'intégrale
+            self.integral = max(min(self.integral, self.integral_max), self.integral_min) # Limit the integral
 
         derivative = desired_velocity - current_velocity  # Velocity error
 
@@ -360,17 +359,20 @@ class MyVisualServoingNode(Node):
 
         image_center_y = image_height / 2
 
-        error = (image_center_y - object_y) / image_height 
+        object_diff = (image_center_y - object_y) / image_height 
 
         tilt_min, tilt_max = 1100, 1900
         tilt_step = 10
 
-        if error > 0.5: # Object is below the center
+        if object_diff > 0.5: # Object is below the center
             self.cam_rc_value = max(tilt_min, self.cam_rc_value - tilt_step)
-        elif error < 0.5:  # Object is above the center
+        elif object_diff < 0.5:  # Object is above the center
             self.cam_rc_value = min(tilt_max, self.cam_rc_value + tilt_step)
 
         self.get_logger().info(f"Camera tilt adjusted to {self.cam_rc_value}")
+
+
+#Controle des lights automatiques, ne fonctionnent pas. Essayer avec Mavlink....
 
 #    def control_lights(self,yaw,forward):
  #       Norm_Yaw = (yaw - 1500) / 400 #vaut entre -1 et 1
@@ -515,8 +517,7 @@ class MyVisualServoingNode(Node):
                                 f' yaw : {yaw_left_right}, '  # need to check
                                 f' thruttle : {forward_reverse}, '  # okay
                                 f' lateral lr : {1500},'  # okay
-                                f' camera tilt : {self.cam_rc_value},'
-                                f'pwm_asserv_prof : {self.pwm_asserv_prof},')
+                                f' camera tilt : {self.cam_rc_value},')
 
     def check_side(self,direction):
        if(direction=='left'):
@@ -614,7 +615,7 @@ class MyVisualServoingNode(Node):
         yaw_left_right = self.mapValueScalSat(-cmd_vel.angular.z)
 
         # self.get_logger().info(f"Yaw speed: {cmd_vel.angular.z}")
-        # self.get_logger().info(f"lateral_left_right speed: {-cmd_vel.linear.y}")
+        # self.get_logger().info(f"lateral_left_right speed: {-cmds_vel.linear.y}")
         forward_reverse = max(min(forward_reverse,1560), 1430)  # not bad actually
 
         #self.control_lights(forward_reverse,yaw_left_right)
@@ -624,10 +625,11 @@ class MyVisualServoingNode(Node):
                               yaw_left_right, forward_reverse, 1500, self.light_rc_value, self.cam_rc_value)
 
         self.get_logger().info(f' Published new command to RCIN :'
-                               f' yaw : {yaw_left_right}, '   #need to check
+                               f' yaw bite : {yaw_left_right}, '   #need to check
                                f' thruttle : {forward_reverse}, '     #okay
                                f' lateral lr : {1500},'  #okay
-                               f' camera tilt : {self.cam_rc_value}') #okay
+                               f' camera tilt : {self.cam_rc_value},'
+                               f' pwm_asserv_prof: {self.pwm_asserv_prof}')
         
 
     def transform_velocity(self, cam_speed, H):
@@ -871,7 +873,7 @@ class MyVisualServoingNode(Node):
             self.get_logger().info("Mode pinger activé, commande forward: " + str(corrected_yaw))
 
         self.get_logger().info(f' Published new command to RCIN :'
-                               f' yaw : {msg_override.channels[3]}, '   #need to check
+                               f' yaw bite: {msg_override.channels[3]}, '   #need to check
                                f' thruttle : {msg_override.channels[4]}, '     #okay
                                f' lateral lr : {1500}')    #okay
 
@@ -993,21 +995,21 @@ class MyVisualServoingNode(Node):
             if self.start_time_filter is None:
                 self.start_time_filter = time.time()
 
-            # Calcul du pas de temps
+            #Calculation of the time step
             current_time = time.time()
             dt = current_time - (self.last_time or current_time)
             self.last_time = current_time
 
-            # Générer la profondeur désirée à partir de la trajectoire polynomiale
+            # Generate the desired depth from the polynomial trajectory
             elapsed_time = current_time - self.start_time_filter
             desired_depth, desired_velocity = self.generate_cubic_trajectory(
                 self.current_depth, self.desired_depth, self.t_final, elapsed_time
                 )
 
-            # Estimer la vitesse verticale (heave) avec le filtre alpha-beta
+            # Estimate (heave) using the alpha-beta filter
             heave_velocity = self.alpha_beta_filter(self.current_depth, dt)
 
-            # Calculer la force de contrôle avec compensation de flottabilité
+            # Calculation of the control force with floatability compensation
             control_force = self.depth_control_pid(
                 desired_depth,
                 desired_velocity,
@@ -1016,11 +1018,11 @@ class MyVisualServoingNode(Node):
                 dt,
                 )
 
-            # Convertir la force en commande PWM
+            # Force Conversion in PWM command
             pwm_value = self.convert_force_to_pwm(control_force)
             self.pwm_asserv_prof = pwm_value
 
-                # Envoyer la commande PWM aux propulseurs verticaux
+            # Send command to PWM
             #self.setOverrideRCIN(1500, 1500, self.pwm_asserv_prof, 1500, 1500, 1500,self.light_rc_value, self.cam_rc_value)
 
     def DvlCallback(self, data):

@@ -47,7 +47,7 @@ class BlueRovGUI:
 
     def on_log_button_clicked(self, widget):
         print("Lancement du script datavideologger.py...")
-        script_path = "/home/projet_sysmer/ros2_ws/src/autonomous_rov/autonomous_rov/datavideologger.py"  # Assurez-vous que ce chemin est correct
+        script_path = "/home/projet_sysmer/ros2_ws/src/autonomous_rov/autonomous_rov/datavideologger.py"  # Verify the path, otherwise it will not work
         subprocess.Popen(f"gnome-terminal -- bash -c 'python3 {script_path}; exec bash'", shell=True)
 
     def on_relaunch_button_clicked(self, widget):
