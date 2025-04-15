@@ -1,4 +1,4 @@
-# Autonomous ROV - Visual Servoing & Image Processing
+# Autonomous ROV - Visual Servoing
 
 This project implements a visual servoing system for an autonomous ROV using ROS 2 Iron. The project includes an object tracking algorithm and a visual control system to adjust the robot's movements based on tracked points in images.
 
@@ -11,6 +11,7 @@ This project implements a visual servoing system for an autonomous ROV using ROS
 - **mavros_msgs**
 - **geometry_msgs**
 - **std_msgs**
+- **Glade GTK**
 
 ## Install Dependencies
 
@@ -29,137 +30,37 @@ Before launching the nodes, source your ROS 2 workspace:
 source ~/ros2_ws/install/setup.bash
 ```
 
-## Launching the Nodes
+## Launching the project
 
-### 1. Launch the Image Processing Node
+### 1. Launching with the GUI
 
-The `image_processing_tracker` node is responsible for receiving camera images and processing them to detect and track an object.
-
-```bash
-ros2 launch autonomous_rov run_video.launch.py
-```
-
-### 2. State Machine 
-The `state_machine` integrates the logics from `visual_servoing_node` into a finite state machine to get a full control of the ROV whatever the situation is.
+You can Launch the projet by launching the GUI first :
 
 ```bash
-ros2 launch autonomous_rov run_state_machine.launch
+ros2 launch autonomous_rov run_gui.launch
 ```
+And clinking on the "Launch" button.
 
-## Project Structure : image_processing_tracker.py
+### 2. Relaunching the state machine with the GUI
 
-### Explanation of the HSV Script
+You can Relaunch the state machine by clicking on the "Relaunch" button **after killing the corresponding terminal first**
 
-The HSV script is designed to track an object using a color-based detection approach. Its workflow includes the following steps:
+### 3. Launching with terminal commands
 
-- **Conversion to HSV Space:**  
-  The captured image (received as a ROS message) is first converted to an OpenCV format, then transformed from BGR to HSV. This transformation makes it easier to isolate specific colors.
+To launch the project you can also use terminal commands by yourself following the order :
 
-- **Color Range Filtering:**  
-  Using a defined HSV value (often obtained by clicking on the image) along with a set tolerance, a mask is created. This mask retains only those pixels whose colors fall within the desired range.
-
-- **Tracked Point Detection:**  
-  The script identifies the filtered pixels from the mask and computes their average to determine the center of the tracked object.
-
-- **Segment Detection:**  
-  By analyzing the contours generated from the mask, the script identifies the largest contour, computes a bounding box, and deduces the extreme points (left and right). These points are then converted into meters using camera calibration parameters, allowing an estimation of the object’s width (segment).
-
-- **Data Publishing:**  
-  The tracked point, the segment (represented by its width), and a desired point (defaulted to the center of the image or defined via a mouse click) are published on ROS topics. This data is used by other parts of the system, such as the visual control module.
-
----
-
-### Improvements Made to the HSV Script
-
-Several enhancements have been implemented to make HSV-based tracking more robust and accurate:
-
-- **Conditional Display and Publishing:**  
-  Overlays (annotations on the OpenCV image) and the publication of ROS messages occur only if both the tracked point and the segment are successfully detected. If either is missing, no overlay is drawn, preventing the display of erroneous information.
-
-- **Vertical Alignment of the Tracked Point:**  
-  The tracked point is now vertically aligned with the center of the segment. In other words, its vertical coordinate is adjusted to match that of the segment, ensuring visual consistency.
-
-- **Segment Width Filtering:**  
-  A check is performed to ensure that the segment’s width (calculated in meters) exceeds a minimum threshold (0.07 m). Segments failing to meet this threshold are rejected, reducing false detections or tracking of objects that are too small.
-
-- **Tracked Point Velocity Control:**  
-  The script calculates the movement speed of the tracked point between successive frames. If this speed exceeds a predefined threshold (e.g., 1 m/s), the new measurement is flagged as aberrant and ignored (or the last valid point is reused). This control helps prevent abrupt fluctuations caused by noise or detection errors.
-
-These improvements enhance the reliability of HSV-based tracking, ensuring optimal integration with the autonomous ROV’s visual servoing system.
-
-
-  **If you encounter issues with image display, ensure you correctly modify the image conversion code:**
-  
-```python
-  try:
-      # If using uncompressed images (sensor_msgs/Image)
-      image_np = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-
-      # If using compressed images (sensor_msgs/CompressedImage)
-      # image_np = self.bridge.compressed_imgmsg_to_cv2(msg)
 ```
-# ImageProcessingWithYolo Node
-
-This ROS2 node performs real-time image processing and object detection using a custom YOLOv5 model. It subscribes to a camera image topic, processes incoming frames to detect objects (e.g., buoys), and publishes tracking information such as the current detected object's position, the desired point, and a segment representing the object's width.
-
-## Main Features
-
-- **YOLOv5 Object Detection**  
-  The node loads a custom YOLOv5 model via PyTorch and performs inference on incoming images. Detection results (bounding boxes, confidence scores, and class labels) are drawn on the image to provide visual feedback.
-
-- **Real-Time Image Processing**  
-  Using CvBridge, the node converts ROS image messages into OpenCV images, applies YOLO detection, and displays the annotated frames in an OpenCV window titled "Result". It also logs the inference time to monitor performance.
-
-- **Coordinate Conversion**  
-  The node includes a helper function to convert pixel coordinates to metric units based on predefined camera calibration parameters. This conversion is applied to both the detected object's position and the desired point.
-
-## Publishers
-
-- **tracked_point** (`Float64MultiArray`)  
-  Publishes the metric coordinates of the current tracked object (e.g., the buoy) based on the center of the detection bounding box.
-
-- **desired_point** (`Float64MultiArray`)  
-  Publishes the desired tracking point in metric coordinates. This point is either the image center by default or set via a right-click by the user.
-
-- **tracked_segment** (`Float64MultiArray`)  
-  Publishes a segment defined by the left and right midpoints of the detected bounding box (converted to metric units), representing the object's width.
-
-## Processing Workflow
-
-1. **Image Reception**  
-   The node subscribes to the `/bluerov2/camera/image` topic to receive raw image frames.
-
-2. **Image Conversion**  
-   ROS image messages are converted to OpenCV BGR images using CvBridge.
-
-3. **Desired Point Selection**  
-   The desired point is initially set to the image center but can be updated via a right-click, which triggers the mouse callback.
-
-4. **Object Detection**  
-   The image is converted from BGR to RGB and passed to the YOLOv5 model for inference. Detected objects are annotated with bounding boxes and labels.
-
-5. **Segment and Point Calculation**  
-   - The left and right midpoints of the first detected bounding box are calculated and drawn as a line.  
-   - These points are converted from pixel coordinates to meters and published as the tracked segment.  
-   - The center of the bounding box is determined and published as the current tracked point.
-
-6. **Data Publishing and Display**  
-   The node publishes the tracked segment, tracked point, and desired point (all in metric units) to their respective topics. The annotated image is then displayed in the "Result" window.
-
-7. **Performance Logging**  
-   The inference time is calculated and logged to help evaluate the node's real-time performance.
-
-## Dependencies
-
-- **ROS2**  
-- **OpenCV**  
-- **CvBridge**  
-- **PyTorch** (for YOLOv5 inference)  
-- **YOLOv5** (custom model loaded from a local repository)
-
-This node is designed for robust real-time object detection and tracking in applications such as buoy tracking for underwater robotics.
-
-
+ros2 launch autonomous_rov run_mavros.launch
+```
+```
+ros2 launch autonomous_rov run_gamepad.launch
+```
+```
+ros2 launch autonomous_rov run_visual_servo.launch
+```
+```
+ros2 launch autonomous_rov run_listener_sysmer.launch
+```
 # MyVisualServoingNode
 
 This ROS2 node implements a visual servoing logic for a BlueROV, integrating various data sources (IMU, depth sensors, joystick, vision) and directly commanding the actuators using messages of type `OverrideRCIn`. It allows controlling the robot's movement, the camera tilt, and the light intensity based on visual tracking (e.g., for buoy detection and tracking).
@@ -240,6 +141,117 @@ This ROS2 node implements a visual servoing logic for a BlueROV, integrating var
   - `mapValueScalSat`: Transforms a value between -1 and 1 into a PWM value (between 1100 and 1900).
 
 ---
+
+# State Machine - Buoy Detection and Tracking
+
+This module implements a state machine for detecting, recognizing, and tracking a buoy. The states are designed to handle different operational phases with robust transitions.
+
+## **Main States**
+
+### 1. **INIT**
+- **Purpose**: Initial state before detection.
+- **Transitions**:
+  - If a point is detected (`tracked_point` is not null) → switch to `RECON`.
+- **Actions**:
+  - Set `buoy_detected` flag.
+  - Record start time (`start_recon_time`).
+
+### 2. **RECON**
+- **Purpose**: Buoy recognition via camera control and visual verification.
+- **Transitions**:
+  - **Signal loss** → `REPOSITIONING` (if timeout occurs).
+  - **Recognition complete** → `TRACKING` (after `recon_time`).
+  - **Verification phase** → `CHECKING` (every 25% of total time).
+- **Actions**:
+  - Adjust camera tilt (`control_camera_tilt`).
+  - Perform visual verification (`visual_circle`).
+
+### 3. **CHECKING**
+- **Purpose**: Obstacle verification during recognition.
+- **Transitions**:
+  - After `checking_time` → `REPOSITIONING`.
+- **Actions**:
+  - Check left/right sides (`check_side`) based on obstacle detection.
+  - Increment iteration counter (`check_iteration`).
+
+### 4. **REPOSITIONING**
+- **Purpose**: Repositioning after signal loss or verification.
+- **Transitions**:
+  - If the point is reacquired → `RECON`.
+- **Actions**:
+  - Alternate left/right turns (`turn_side`) based on the last movement.
+
+### 5. **SEARCHING**
+- **Purpose**: Active buoy search.
+- **Transitions**:
+  - If the buoy is detected → `TRACKING`.
+- **Actions**:
+  - Initiate search protocol (`search_for_buoy`).
+
+### 6. **TRACKING**
+- **Purpose**: Continuous buoy tracking.
+- **Transitions**:
+  - **Signal loss** → `LOST` (if timeout occurs).
+- **Actions**:
+  - Adjust camera tilt (`control_camera_tilt`).
+  - Perform visual servo control (`compute_visual_servo`).
+
+### 7. **LOST**
+- **Purpose**: Recovery after prolonged signal loss.
+- **Actions**:
+  - Reorient to the last known position (`reorient_to_last_known_position`).
+
+---
+
+## **Transition Logic**
+- **Timeout**: Managed via `last_tracked_time` and `timeout_duration`.
+- **Timing**: Timestamps (`time.time()`) for critical phases.
+- **Error Handling**: Fallback to `REPOSITIONING` on local failures.
+
+## **Logging**
+- Informational messages (`INFO`) for standard transitions.
+- Warnings (`WARN`) for critical events (e.g., signal loss).
+
+> **Note**: Time parameters (`recon_time`, `checking_time`, etc.) are configurable to adapt to environmental conditions.
+
+# Depth Control System Overview
+
+This module implements a comprehensive depth control system for underwater vehicles, combining smooth trajectory planning, robust feedback control, and sensor data filtering to maintain precise depth regulation.
+
+## Cubic Trajectory Generation
+
+The system generates a smooth cubic polynomial trajectory to transition the vehicle's depth from an initial value to a desired final depth over a specified time interval. This approach ensures continuous position and velocity profiles, minimizing mechanical stress and abrupt movements during depth changes.
+
+## PID Control with Buoyancy Compensation
+
+A PID controller regulates the vertical position by computing the control force needed to reach the desired depth. The controller includes:
+
+- **Proportional term** to correct the current depth error.
+- **Integral term** to eliminate steady-state error, with anti-windup logic that resets the integral when the error and velocity are sufficiently small.
+- **Derivative term** based on the difference between desired and actual vertical velocities, providing damping.
+- **Buoyancy compensation** as a constant offset to counteract the vehicle's inherent floatability, improving control accuracy.
+
+## Alpha-Beta Filter for Velocity Estimation
+
+To estimate the vertical velocity (heave) from noisy depth measurements, the system uses an alpha-beta filter. This filter predicts the current depth based on previous estimates and updates the velocity estimate by blending the prediction with the new measurement. The filter balances responsiveness and noise rejection without the complexity of a full Kalman filter.
+
+## Force to PWM Conversion
+
+The computed control force (in kgf) is converted into a PWM signal to command the vertical thrusters. The conversion applies different scaling factors depending on the force direction (upward or downward) and clamps the PWM values within safe limits to protect the motors from damage.
+
+## Integration and Real-Time Control
+
+The depth control loop runs within a sensor callback function that:
+
+- Receives the current depth measurement.
+- Calculates the elapsed time since the last update.
+- Generates the desired depth and velocity from the cubic trajectory.
+- Estimates the current vertical velocity using the alpha-beta filter.
+- Computes the control force via the PID controller.
+- Converts the force to a PWM command.
+- Sends the PWM command to the thrusters.
+
+This real-time integration ensures smooth, stable, and responsive depth control, adapting continuously to sensor feedback and environmental conditions.
 
 # Troubleshooting
 
