@@ -84,8 +84,16 @@ class ImageProcessingNode(Node):
                 writer = csv.writer(file)
                 writer.writerow(["Iteration", "ExecutionTime (ms)"])
 
+        # Ajout du compteur de frames pour le skip
+        self.frame_skip = 2  # Garde 1 frame sur 2
+        self.frame_count = 0
+
     def cameracallback(self, msg):
         self.iteration += 1
+
+        self.frame_count += 1
+        if self.frame_count % self.frame_skip != 0:
+            return  # Ignore cette frame
         begin_time = time.time()
 
         global get_hsv, set_desired_point, mouseX, mouseY, hsv_value

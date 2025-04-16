@@ -56,7 +56,7 @@ ros2 launch autonomous_rov run_mavros.launch
 ros2 launch autonomous_rov run_gamepad.launch
 ```
 ```
-ros2 launch autonomous_rov run_visual_servo.launch
+ros2 launch autonomous_rov run_video.launch
 ```
 ```
 ros2 launch autonomous_rov run_listener_sysmer.launch
